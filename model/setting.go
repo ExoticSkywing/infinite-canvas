@@ -227,7 +227,7 @@ type PrivateLinuxDoAuthSetting struct {
 // Setting 系统配置。
 type Setting struct {
 	Key       SettingKey      `json:"key" gorm:"primaryKey"`
-	Value     json.RawMessage `json:"value" gorm:"serializer:json"`
+	Value     json.RawMessage `json:"value" gorm:"type:longtext;serializer:json"`
 	CreatedAt string          `json:"createdAt"`
 	UpdatedAt string          `json:"updatedAt"`
 }

@@ -5,11 +5,11 @@ type Prompt struct {
 	ID        string   `json:"id" gorm:"primaryKey"`
 	Title     string   `json:"title"`
 	CoverURL  string   `json:"coverUrl"`
-	Prompt    string   `json:"prompt"`
-	Tags      []string `json:"tags" gorm:"serializer:json"`
+	Prompt    string   `json:"prompt" gorm:"type:longtext"`
+	Tags      []string `json:"tags" gorm:"type:text;serializer:json"`
 	Category  string   `json:"category" gorm:"index"`
 	GithubURL string   `json:"githubUrl" gorm:"-"`
-	Preview   string   `json:"preview"`
+	Preview   string   `json:"preview" gorm:"type:text"`
 	CreatedAt string   `json:"createdAt"`
 	UpdatedAt string   `json:"updatedAt"`
 }

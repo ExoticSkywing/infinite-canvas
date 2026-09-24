@@ -10,7 +10,7 @@ type AgentSkillFile struct {
 	SkillID   string `json:"-" gorm:"primaryKey"`
 	Path      string `json:"path" gorm:"primaryKey"`
 	Kind      string `json:"kind"`
-	Content   string `json:"content"`
+	Content   string `json:"content" gorm:"type:longtext"`
 	Sort      int    `json:"sort"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`

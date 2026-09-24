@@ -92,7 +92,10 @@ func DB() (*gorm.DB, error) {
 func dialector(driver string, dsn string) gorm.Dialector {
 	switch driver {
 	case "mysql":
-		return gormmysql.Open(dsn)
+		return gormmysql.New(gormmysql.Config{
+			DSN:               dsn,
+			DefaultStringSize: 191,
+		})
 	case "postgres", "postgresql":
 		return postgres.Open(dsn)
 	default:

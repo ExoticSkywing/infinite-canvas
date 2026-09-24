@@ -13,10 +13,10 @@ type Asset struct {
 	Title       string    `json:"title"`
 	Type        AssetType `json:"type"`
 	CoverURL    string    `json:"coverUrl"`
-	Tags        []string  `json:"tags" gorm:"serializer:json"`
+	Tags        []string  `json:"tags" gorm:"type:text;serializer:json"`
 	Category    string    `json:"category"`
-	Description string    `json:"description"`
-	Content     string    `json:"content,omitempty"`
+	Description string    `json:"description" gorm:"type:text"`
+	Content     string    `json:"content,omitempty" gorm:"type:longtext"`
 	URL         string    `json:"url,omitempty"`
 	CreatedAt   string    `json:"createdAt"`
 	UpdatedAt   string    `json:"updatedAt"`

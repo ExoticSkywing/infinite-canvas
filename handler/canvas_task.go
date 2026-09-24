@@ -440,11 +440,15 @@ func stripCanvasTaskMultipartFields(raw []byte, contentType string, normalizeIma
 	var buffer bytes.Buffer
 	writer := multipart.NewWriter(&buffer)
 	meta := map[string]string{}
+	isEdit := len(form.Value["_canvas_endpoint"]) > 0 && form.Value["_canvas_endpoint"][0] == "/images/edits"
 	for key, values := range form.Value {
 		if strings.HasPrefix(key, "_canvas_") {
 			if len(values) > 0 {
 				meta[key] = values[0]
 			}
+			continue
+		}
+		if isEdit && key == "quality" {
 			continue
 		}
 		for _, value := range values {
