@@ -207,7 +207,7 @@ function PickerCard({
                         <button
                             type="button"
                             title="编辑素材"
-                            className="flex size-6 items-center justify-center rounded-md bg-stone-900/80 text-stone-200 shadow-md backdrop-blur-sm transition hover:bg-stone-950 hover:text-white dark:bg-stone-800/80 dark:text-stone-300 dark:hover:bg-stone-700"
+                            className="flex size-6 items-center justify-center rounded-md border border-stone-200/90 bg-white/90 text-stone-600 shadow-sm backdrop-blur-sm transition hover:border-stone-300 hover:bg-stone-50 hover:text-stone-900 dark:border-stone-700/80 dark:bg-stone-800/90 dark:text-stone-300 dark:hover:border-stone-600 dark:hover:bg-stone-700 dark:hover:text-white"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
@@ -221,7 +221,7 @@ function PickerCard({
                         <button
                             type="button"
                             title="删除素材"
-                            className="flex size-6 items-center justify-center rounded-md bg-stone-900/80 text-stone-200 shadow-md backdrop-blur-sm transition hover:bg-red-600 hover:text-white dark:bg-stone-800/80 dark:text-stone-300 dark:hover:bg-red-600"
+                            className="flex size-6 items-center justify-center rounded-md border border-stone-200/90 bg-white/90 text-stone-600 shadow-sm backdrop-blur-sm transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-stone-700/80 dark:bg-stone-800/90 dark:text-stone-300 dark:hover:border-red-900/50 dark:hover:bg-red-950/60 dark:hover:text-red-400"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
