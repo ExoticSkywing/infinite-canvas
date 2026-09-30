@@ -2,6 +2,10 @@
 
 ## Unreleased
 
++ [新增] 新增 TokenDance 模型渠道，支持 OAuth 一键登录获取 Key
++ [调整] Canvas Agent 禁用 Codex 内置图片生成，统一使用画布图片生成链路
++ [修复] 修复后台渠道配置尚未加载完成时可能以空数据覆盖原配置的问题
+
 ## v0.8.0 - 2026-09-24
 
 + [新增] 新增 RunningHub 与 ComfyUI 工作流渠道

@@ -11,6 +11,7 @@ import { ChannelModelSelectorModal } from "@/components/channel-model-selector-m
 import type { WorkflowChannelSettings } from "@/components/workflow/workflow-channel-pane";
 import { useAutoDLWorkflowNames } from "@/hooks/use-autodl-workflow";
 import { isWorkflowProtocol, modelChannelApiKeyUrls, modelChannelDefaultBaseUrls, modelChannelProtocolOptions } from "@/lib/model-channel";
+import { startTokenDanceOAuth } from "@/lib/tokendance-oauth";
 import { fetchAdminSettings, fetchChannelModels, measureAdminStorageProvider, saveAdminSettings, testChannelModel, type AdminModelChannel, type AdminModelCost, type AdminSettings, type AdminStorageProvider } from "@/services/api/admin";
 import { clearStorageConfigCache as clearMediaStorageConfigCache } from "@/services/file-storage";
 import { clearStorageConfigCache as clearImageStorageConfigCache } from "@/services/image-storage";
@@ -121,6 +122,39 @@ export default function AdminSettingsPage() {
         void loadSettings();
     }, [token]);
 
+    useEffect(() => {
+        if (!token) return;
+        const url = new URL(window.location.href);
+        const flow = url.searchParams.get("tokendance_oauth");
+        const storageKey = flow ? `tokendance:oauth-result:${flow}` : "";
+        const raw = storageKey ? sessionStorage.getItem(storageKey) : null;
+        if (!raw) return;
+
+        try {
+            const result = JSON.parse(raw) as {
+                key?: string;
+                draft?: Partial<AdminModelChannel>;
+                editingChannelIndex?: number | null;
+            };
+            if (!result.key || !result.draft) throw new Error("TokenDance 授权结果不完整");
+
+            const channel = normalizeChannel({ ...result.draft, apiKey: result.key });
+            setActiveTab("private");
+            setEditingChannelIndex(typeof result.editingChannelIndex === "number" ? result.editingChannelIndex : null);
+            channelForm.setFieldsValue(channel);
+            setWorkflowChannelDraft(channel);
+            setIsChannelDrawerOpen(true);
+            rememberModels(channel.models);
+            message.success("TokenDance 登录成功，API Key 已填入");
+        } catch (error) {
+            message.error(error instanceof Error ? error.message : "TokenDance 授权结果读取失败");
+        } finally {
+            sessionStorage.removeItem(storageKey);
+            url.searchParams.delete("tokendance_oauth");
+            window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+        }
+    }, [channelForm, message, token]);
+
     const changeTab = (nextTab: SettingsTabKey) => {
         setActiveTab(nextTab);
     };
@@ -200,6 +234,14 @@ export default function AdminSettingsPage() {
         setIsChannelDrawerOpen(false);
         setEditingChannelIndex(null);
         channelForm.resetFields();
+    };
+
+    const loginTokenDance = () => {
+        void startTokenDanceOAuth({
+            target: "admin",
+            draft: channelForm.getFieldsValue(true) as unknown as Record<string, unknown>,
+            editingChannelIndex,
+        }).catch((error) => message.error(error instanceof Error ? error.message : "TokenDance 登录失败"));
     };
 
     const saveChannel = async () => {
@@ -850,7 +892,7 @@ export default function AdminSettingsPage() {
                     extra={
                         <Space>
                             <Button onClick={closeChannelDrawer}>取消</Button>
-                            <Button type="primary" onClick={() => void saveChannel()}>
+                            <Button type="primary" disabled={isLoading} onClick={() => void saveChannel()}>
                                 保存
                             </Button>
                         </Space>
@@ -897,10 +939,16 @@ export default function AdminSettingsPage() {
                                     label={
                                         <span className="relative inline-flex items-center">
                                             接口地址
-                                            {channelApiKeyUrl ? (
+                                            {channelProtocol === "tokendance" || channelApiKeyUrl ? (
                                                 <span className="absolute left-full top-1/2 ml-2 -translate-y-1/2 whitespace-nowrap">
-                                                    <Button type="primary" size="small" href={channelApiKeyUrl} target="_blank">
-                                                        获取 API Key
+                                                    <Button
+                                                        type="primary"
+                                                        size="small"
+                                                        href={channelProtocol === "tokendance" ? undefined : channelApiKeyUrl}
+                                                        target={channelProtocol === "tokendance" ? undefined : "_blank"}
+                                                        onClick={channelProtocol === "tokendance" ? () => void loginTokenDance() : undefined}
+                                                    >
+                                                        {channelProtocol === "tokendance" ? "登录" : "获取 API Key"}
                                                     </Button>
                                                 </span>
                                             ) : null}

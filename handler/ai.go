@@ -243,7 +243,11 @@ func copyAIResponse(w http.ResponseWriter, request *http.Request, channel model.
 			onFailure()
 		}
 		saveAIProxyLog(logContext, response.StatusCode, string(payload), strings.TrimSpace(string(payload)))
-		Fail(w, readUpstreamAIErrorMessage(payload, response.StatusCode))
+		message := readUpstreamAIErrorMessage(payload, response.StatusCode)
+		if service.IsTokenDanceChannel(channel) {
+			message = firstNonEmpty(service.TokenDanceRecoveryMessage(response.Header.Get("TokenDance-Recovery-Action")), message)
+		}
+		Fail(w, message)
 		return
 	}
 

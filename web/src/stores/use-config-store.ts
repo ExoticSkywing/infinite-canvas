@@ -276,9 +276,7 @@ function isVideoModelName(model: string) {
         value.includes("wan/2-7-image-to-video") ||
         value.includes("wan/2-7-videoedit") ||
         value.includes("wan/2-7-r2v") ||
-        value.includes("sd2.0 720p") ||
-        value.includes("sd2.5 480p") ||
-        value.includes("sd2.5 720p") ||
+        (value.includes("sd") && !value.includes("sdxl")) ||
         (value.includes("grok-imagine") && (value.includes("/upscale") || value.includes("/extend")))
     );
 }

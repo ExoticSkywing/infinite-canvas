@@ -462,7 +462,7 @@ func isVideoModelName(modelName string) bool {
 	if kind := AutoDLModelKind(modelName); kind != "unsupported" {
 		return kind == "video"
 	}
-	return name == "minimax-h3" || strings.Contains(name, "seedance") || strings.Contains(name, "video") || strings.Contains(name, "sd2.0 720p") || strings.Contains(name, "sd2.5 720p")
+	return name == "minimax-h3" || strings.Contains(name, "seedance") || strings.Contains(name, "video") || (strings.Contains(name, "sd") && !strings.Contains(name, "sdxl"))
 }
 
 func isImageModelName(modelName string) bool {

@@ -16,6 +16,7 @@ const (
 	ModelChannelProtocol88API    = "88api"
 	ModelChannelProtocolAutoDL   = "autodl"
 	ModelChannelProtocolArk      = "ark"
+	ModelChannelProtocolTokenDance = "tokendance"
 )
 
 type modelProtocolAdapter struct {
@@ -31,7 +32,7 @@ type modelProtocolRule struct {
 }
 
 var modelProtocolRegistry map[string]modelProtocolAdapter
-var modelProtocolIDs = []string{ModelChannelProtocolOpenAI, ModelChannelProtocolGemini, ModelChannelProtocolGrok2API, ModelChannelProtocolMiniMax, ModelChannelProtocolAPIMart, ModelChannelProtocolKIE, ModelChannelProtocolMiMo, ModelChannelProtocol88API, ModelChannelProtocolAutoDL, ModelChannelProtocolArk}
+var modelProtocolIDs = []string{ModelChannelProtocolOpenAI, ModelChannelProtocolGemini, ModelChannelProtocolGrok2API, ModelChannelProtocolMiniMax, ModelChannelProtocolAPIMart, ModelChannelProtocolKIE, ModelChannelProtocolMiMo, ModelChannelProtocol88API, ModelChannelProtocolAutoDL, ModelChannelProtocolArk, ModelChannelProtocolTokenDance}
 
 func init() {
 	compatible := modelProtocolAdapter{
@@ -42,7 +43,7 @@ func init() {
 		models:    fetchOpenAIAdminChannelModels,
 		testModel: testOpenAIChannelModel,
 	}
-	modelProtocolRegistry = make(map[string]modelProtocolAdapter, 10)
+	modelProtocolRegistry = make(map[string]modelProtocolAdapter, 11)
 	for _, id := range modelProtocolIDs {
 		modelProtocolRegistry[id] = compatible
 	}
@@ -112,6 +113,9 @@ func init() {
 	ark := compatible
 	ark.testModel = testArkSeedanceChannelModel
 	modelProtocolRegistry[ModelChannelProtocolArk] = ark
+	tokenDance := compatible
+	tokenDance.buildURL = BuildTokenDanceChannelURL
+	modelProtocolRegistry[ModelChannelProtocolTokenDance] = tokenDance
 	glm := compatible
 	glm.testModel = testGLMTTSChannelModel
 	modelProtocolRegistry["model:glm-tts"] = glm
@@ -160,6 +164,10 @@ func modelProtocolForChannel(channel model.ModelChannel) modelProtocolAdapter {
 
 func IsArkChannel(channel model.ModelChannel) bool {
 	return strings.EqualFold(strings.TrimSpace(channel.Protocol), ModelChannelProtocolArk)
+}
+
+func IsTokenDanceChannel(channel model.ModelChannel) bool {
+	return strings.EqualFold(strings.TrimSpace(channel.Protocol), ModelChannelProtocolTokenDance)
 }
 
 func matchModelProtocol(rules []modelProtocolRule, channel model.ModelChannel, modelName string) (modelProtocolAdapter, bool) {

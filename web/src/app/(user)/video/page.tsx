@@ -1465,7 +1465,7 @@ function WorkbenchPanel({
     const klingBottomProvider = klingBottomConfig?.provider || "apimart";
     const klingBottom = Boolean(klingBottomConfig);
     const showAudioSwitch = klingBottom || audioGenerationEnabled;
-    const motionControl = !config.videoWorkflowRef && (isAPIMartKlingMotionControlConfig(config, model) || isKIEKlingMotionControlConfig(config, model));
+    const motionControl = !config.videoWorkflowRef && (isAPIMartKlingMotionControlConfig(config, model) || isKIEKlingMotionControlConfig(config, model) || (videoChannelProtocol(config, model) === "tokendance" && modelKey(model) === "kling-3-0"));
     const bottomSettingsGridClass = motionControl
         ? showAudioSwitch ? "lg:grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr_0.8fr_0.8fr_0.7fr_auto_auto]" : "lg:grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr_0.8fr_0.7fr_auto_auto]"
         : showAudioSwitch ? "lg:grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr_0.8fr_0.7fr_auto_auto]" : "lg:grid-cols-[1.3fr_0.8fr_0.8fr_0.7fr_0.7fr_auto_auto]";

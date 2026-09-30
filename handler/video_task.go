@@ -83,7 +83,15 @@ func proxyAIVideoTaskRequest(w http.ResponseWriter, r *http.Request) {
 		credits *= float64(readAIRequestCount(body, contentType, true))
 	}
 	upstreamPath := resolveAIProxyPath(channel, modelName, "/videos")
-	body, contentType, err = normalizeVideoCreateBody(body, contentType, modelName, channel, upstreamPath)
+	if service.IsTokenDanceChannel(channel) {
+		prepared, _, prepareErr := prepareAIProtocolRequest(aiProtocolRequest{
+			mode: aiProtocolVideoRequest, body: body, contentType: contentType, modelName: modelName,
+			channel: channel, endpoint: "/videos", path: upstreamPath,
+		})
+		body, contentType, upstreamPath, err = prepared.body, prepared.contentType, prepared.path, prepareErr
+	} else {
+		body, contentType, err = normalizeVideoCreateBody(body, contentType, modelName, channel, upstreamPath)
+	}
 	if err != nil {
 		log.Printf("AI video normalize request failed: model=%s err=%v", modelName, err)
 		if service.IsAutoDLChannel(channel) {
@@ -370,6 +378,11 @@ func doAIRequest(request *http.Request, channel model.ModelChannel) ([]byte, int
 	}
 	defer response.Body.Close()
 	payload, _ := io.ReadAll(io.LimitReader(response.Body, 1024*1024))
+	if response.StatusCode >= http.StatusBadRequest && service.IsTokenDanceChannel(channel) {
+		if message := service.TokenDanceRecoveryMessage(response.Header.Get("TokenDance-Recovery-Action")); message != "" {
+			payload, _ = json.Marshal(map[string]any{"error": map[string]any{"message": message}})
+		}
+	}
 	return payload, response.StatusCode, nil
 }
 

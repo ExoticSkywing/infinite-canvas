@@ -18,6 +18,7 @@ import { isGeminiConfig, isGeminiTtsModel } from "@/lib/gemini";
 import { geminiTtsVoiceOptions, normalizeGeminiTtsVoice } from "@/lib/gemini-tts";
 import { isMimoPresetTtsModel, isMimoTtsModel, isMimoVoiceCloneModel, isMimoVoiceDesignModel, mimoTtsFormatOptions, mimoTtsVoiceOptions } from "@/lib/mimo-tts";
 import { isWorkflowProtocol, modelChannelApiKeyUrls, modelChannelDefaultBaseUrls, modelChannelProtocolOptions } from "@/lib/model-channel";
+import { startTokenDanceOAuth } from "@/lib/tokendance-oauth";
 import type { WorkflowChannelData, WorkflowEntry } from "@/lib/workflow-channel";
 import { listWorkflowChannels, readWorkflowChannel, replaceWorkflowChannels, saveWorkflowChannel } from "@/services/workflow-channel-storage";
 import { filterChannelModelsByCapability, normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig, type LocalModelChannel, type ModelCapability } from "@/stores/use-config-store";
@@ -279,6 +280,11 @@ export function AppConfigModal() {
         updateLocalChannels(normalizeLocalChannels(config).filter((channel) => channel.id !== id));
     };
 
+    const loginTokenDance = (channelId: string) => {
+        void startTokenDanceOAuth({ target: "local", channelId })
+            .catch((error) => message.error(error instanceof Error ? error.message : "TokenDance 登录失败"));
+    };
+
     const openLocalModelSelector = (channel: LocalModelChannel) => setModelSelectChannelId(channel.id);
 
     const closeLocalModelSelector = () => setModelSelectChannelId("");
@@ -448,10 +454,17 @@ export function AppConfigModal() {
                                                 <Button size="small" danger disabled={index === 0 && normalizeLocalChannels(config).length === 1} onClick={() => removeLocalChannel(channel.id)}>
                                                     删除
                                                 </Button>
-                                                {modelChannelApiKeyUrls[channel.protocol] ? (
+                                                {channel.protocol === "tokendance" || modelChannelApiKeyUrls[channel.protocol] ? (
                                                     <div className="w-full md:absolute md:left-0 md:top-8">
-                                                        <Button block type="primary" size="small" href={modelChannelApiKeyUrls[channel.protocol]} target="_blank">
-                                                            获取 API Key
+                                                        <Button
+                                                            block
+                                                            type="primary"
+                                                            size="small"
+                                                            href={channel.protocol === "tokendance" ? undefined : modelChannelApiKeyUrls[channel.protocol]}
+                                                            target={channel.protocol === "tokendance" ? undefined : "_blank"}
+                                                            onClick={channel.protocol === "tokendance" ? () => void loginTokenDance(channel.id) : undefined}
+                                                        >
+                                                            {channel.protocol === "tokendance" ? "登录" : "获取 API Key"}
                                                         </Button>
                                                     </div>
                                                 ) : null}

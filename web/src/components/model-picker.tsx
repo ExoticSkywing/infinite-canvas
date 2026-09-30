@@ -56,7 +56,7 @@ export function ModelPicker({ config, value, channelId, capability, onChange, wo
         return channelOptions.find((item) => item.model === value && item.channelId === channelId) || channelOptions.find((item) => item.model === value);
     }, [channelId, channelOptions, value, workflowEnabled, workflowRef]);
     const options = channelOptions;
-    const current = workflowRef && workflowEnabled ? (currentOption && "label" in currentOption ? currentOption.label : "") : (currentOption || config.channelMode !== "remote" ? value || "" : "");
+    const current = workflowRef && workflowEnabled ? (currentOption && "label" in currentOption ? currentOption.label : "") : value || "";
     const currentValue = current && currentOption ? currentOption.key : "";
 
 	useEffect(() => {

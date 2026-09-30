@@ -24,6 +24,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const isLoginPage = pathname === "/login" || pathname === "/admin/login";
+    const isTokenDanceCallback = pathname === "/tokendance/callback";
     const adminRemoteTokenRef = useRef("");
     const accountSessionRef = useRef({ token, userId: user?.id || "" });
 
@@ -45,10 +46,15 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     }, [hydrateUser, isLoginPage]);
 
 	useEffect(() => {
-		if (!token || user?.role !== "admin" || adminRemoteTokenRef.current === token) return;
+		if (!token || adminRemoteTokenRef.current === token) return;
+		if (isTokenDanceCallback) {
+			adminRemoteTokenRef.current = token;
+			return;
+		}
+		if (user?.role !== "admin") return;
 		adminRemoteTokenRef.current = token;
 		if (channelMode !== "remote") updateConfig("channelMode", "remote");
-	}, [channelMode, token, updateConfig, user?.role]);
+	}, [channelMode, isTokenDanceCallback, token, updateConfig, user?.role]);
 
 	useLayoutEffect(() => {
 		const previous = accountSessionRef.current;
@@ -62,7 +68,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
 	}, [token, updateConfig, user?.id]);
 
 	useEffect(() => {
-        if (!token || !user?.id) return;
+        if (isTokenDanceCallback || !token || !user?.id) return;
         const accountToken = token;
         const accountId = user.id;
         let canceled = false;
@@ -107,7 +113,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         return () => {
             canceled = true;
         };
-    }, [token, updateConfig, user?.id]);
+    }, [isTokenDanceCallback, token, updateConfig, user?.id]);
 
     useEffect(() => {
         if (handledConfigParams.current) return;

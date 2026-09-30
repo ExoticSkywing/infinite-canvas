@@ -4,11 +4,13 @@ import { isMiniMaxChannel, miniMaxModels } from "@/lib/minimax-video";
 import { dataUrlToFile } from "@/lib/image-utils";
 import { isKIESeedreamLayerDecompositionModel } from "@/lib/kie-models";
 import { isMimoChannel, mimoModels } from "@/lib/mimo-tts";
+import { modelChannelAttributionHeaders } from "@/lib/model-channel";
 import { dataUrlToGeminiInlineData, geminiActionUrl, geminiDirectHeaders, geminiErrorMessage, isGeminiConfig, normalizeGeminiBaseUrl } from "@/lib/gemini";
 import { autoSyncImage, imageToDataUrl, resolveImageUrl, type UploadedImage } from "@/services/image-storage";
 import { buildApiUrl, channelIdForActiveModel, channelProtocolForConfig, directAIProviderForConfig, localChannelForActiveModel, type AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { fetchAutoDLWorkflows } from "./autodl";
+import { tokenDanceRecoveryMessage } from "./protocols/tokendance";
 import type { ReferenceImage } from "@/types/image";
 import { nanoid } from "nanoid";
 
@@ -549,6 +551,7 @@ export function aiHeaders(config: AiConfig, contentType?: string) {
     if (isGeminiConfig(config)) return geminiDirectHeaders(config);
     return {
         Authorization: `Bearer ${localChannelForActiveModel(config)?.apiKey || config.apiKey}`,
+        ...modelChannelAttributionHeaders(channelProtocolForConfig(config)),
         ...(contentType ? { "Content-Type": contentType } : {}),
     };
 }
@@ -1183,7 +1186,11 @@ export async function requestImageQuestion(config: AiConfig, messages: ChatCompl
             });
             if (!response.ok) {
                 const error = await fetchErrorDetail(response, "请求失败");
-                throw new ImageRequestError(error.message, error.detail);
+                throw new ImageRequestError(
+                    tokenDanceRecoveryMessage(channelProtocolForConfig(config) === "tokendance" ? response.headers.get("TokenDance-Recovery-Action") : null)
+                        || error.message,
+                    error.detail,
+                );
             }
             if (isEventStreamResponse(response)) {
                 await readJsonServerSentEvents(response, (event) => {
@@ -1246,6 +1253,7 @@ export async function fetchImageModels(config: AiConfig) {
         const response = await axios.get<{ data?: Array<{ id?: string }>; error?: { message?: string } }>(buildApiUrl(config.baseUrl, "/models"), {
             headers: {
                 Authorization: `Bearer ${config.apiKey}`,
+                ...modelChannelAttributionHeaders(channel?.protocol || ""),
             },
             timeout: IMAGE_REQUEST_TIMEOUT_SECONDS * 1000,
         });
