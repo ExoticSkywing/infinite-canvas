@@ -17,12 +17,12 @@ type VideoTask struct {
 	Progress        int     `json:"progress"`
 	Seconds         string  `json:"seconds"`
 	Size            string  `json:"size"`
-	VideoURL        string  `json:"videoUrl" gorm:"type:text"`
+	VideoURL        string  `json:"videoUrl" gorm:"type:longtext"`
 	Error           string  `json:"error" gorm:"type:text"`
 	ErrorDetail     string  `json:"errorDetail" gorm:"type:text"`
 	RequestBody     string  `json:"requestBody" gorm:"type:text"`
-	ResponseBody    string  `json:"responseBody" gorm:"type:text"`
-	LastResponse    string  `json:"lastResponse" gorm:"type:text"`
+	ResponseBody    string  `json:"responseBody" gorm:"type:longtext"`
+	LastResponse    string  `json:"lastResponse" gorm:"type:longtext"`
 	Credits         float64 `json:"credits" gorm:"type:decimal(20,2)"`
 	CreatedAt       string  `json:"createdAt" gorm:"index;index:idx_video_tasks_status_created_at,priority:2"`
 	UpdatedAt       string  `json:"updatedAt" gorm:"index"`

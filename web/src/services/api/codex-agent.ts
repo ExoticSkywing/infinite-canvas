@@ -15,11 +15,20 @@ export type CodexModel = {
     supportedReasoningEfforts: Array<{ reasoningEffort: string; description: string }>;
 };
 export function normalizeCodexEndpoint(endpoint: string) {
+    const raw = (endpoint || "").trim().replace(/\/+$/, "");
+    if (!raw) return "/api/agent";
+    if (raw.startsWith("/")) return raw;
     try {
-        const url = new URL(endpoint);
-        if (url.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(url.hostname) || url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error();
-        return url.origin;
-    } catch { throw new Error("本地 Agent 地址必须为 http://127.0.0.1:端口"); }
+        const url = new URL(raw);
+        if (url.username || url.password || url.search || url.hash) throw new Error();
+        if (url.protocol === "http:" && ["127.0.0.1", "localhost"].includes(url.hostname)) {
+            return url.origin;
+        }
+        if (["http:", "https:"].includes(url.protocol)) {
+            return url.origin + (url.pathname === "/" ? "" : url.pathname);
+        }
+        throw new Error();
+    } catch { throw new Error("Agent 地址格式不正确，支持 /api/agent 或 http://127.0.0.1:端口"); }
 }
 export async function readCodexAgentConfig(endpoint: string): Promise<{ url: string; hasToken: boolean }> {
     const url = normalizeCodexEndpoint(endpoint);

@@ -1,9 +1,9 @@
 "use client";
 
 import { memo, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Empty, Input, Pagination, Select, Spin } from "antd";
+import { App, Empty, Input, Pagination, Select, Spin } from "antd";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, ChevronRight, Clapperboard, Eye, FileText, Group, Image as ImageIcon, Music2, Plus, Search, Settings2, Type, Video } from "lucide-react";
+import { BookOpen, ChevronRight, Clapperboard, Eye, FileText, Group, Image as ImageIcon, Music2, Pencil, Plus, Search, Settings2, Trash2, Type, Video } from "lucide-react";
 import { motion } from "motion/react";
 
 import { AssetFormModal } from "@/components/assets/asset-form-modal";
@@ -266,6 +266,17 @@ function CanvasNodesTab({ nodes, selectedNodeIds, onFocusNode, theme }: { nodes:
 const CanvasAssetsTab = memo(function CanvasAssetsTab({ theme, onAssetDragStart, onAssetDragEnd }: { theme: CanvasTheme; onAssetDragStart: (payload: InsertAssetPayload) => void; onAssetDragEnd: () => void }) {
     const [source, setSource] = useState<"mine" | "library">("mine");
     const [formOpen, setFormOpen] = useState(false);
+    const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+
+    const handleOpenAdd = () => {
+        setEditingAsset(null);
+        setFormOpen(true);
+    };
+
+    const handleOpenEdit = (asset: Asset) => {
+        setEditingAsset(asset);
+        setFormOpen(true);
+    };
 
     return (
         <div className="flex h-full flex-col">
@@ -274,11 +285,18 @@ const CanvasAssetsTab = memo(function CanvasAssetsTab({ theme, onAssetDragStart,
                 <AssetSourceTab label="素材库" active={source === "library"} theme={theme} onClick={() => setSource("library")} />
             </div>
             {source === "mine" ? (
-                <MyAssetsTab theme={theme} onAdd={() => setFormOpen(true)} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />
+                <MyAssetsTab theme={theme} onAdd={handleOpenAdd} onEdit={handleOpenEdit} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />
             ) : (
                 <LibraryAssetsTab theme={theme} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />
             )}
-            <AssetFormModal open={formOpen} onClose={() => setFormOpen(false)} />
+            <AssetFormModal
+                open={formOpen}
+                asset={editingAsset}
+                onClose={() => {
+                    setFormOpen(false);
+                    setEditingAsset(null);
+                }}
+            />
         </div>
     );
 });
@@ -292,7 +310,21 @@ function AssetSourceTab({ label, active, theme, onClick }: { label: string; acti
     );
 }
 
-function MyAssetsTab({ theme, onAdd, onAssetDragStart, onAssetDragEnd }: { theme: CanvasTheme; onAdd: () => void; onAssetDragStart: (payload: InsertAssetPayload) => void; onAssetDragEnd: () => void }) {
+function MyAssetsTab({
+    theme,
+    onAdd,
+    onEdit,
+    onAssetDragStart,
+    onAssetDragEnd,
+}: {
+    theme: CanvasTheme;
+    onAdd: () => void;
+    onEdit: (asset: Asset) => void;
+    onAssetDragStart: (payload: InsertAssetPayload) => void;
+    onAssetDragEnd: () => void;
+}) {
+    const { modal, message } = App.useApp();
+    const removeAsset = useAssetStore((state) => state.removeAsset);
     const assets = useAssetStore((state) => state.assets);
     const [keyword, setKeyword] = useState("");
     const [type, setType] = useState("");
@@ -333,7 +365,36 @@ function MyAssetsTab({ theme, onAdd, onAssetDragStart, onAssetDragEnd }: { theme
                 </button>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-                {filtered.length ? <div className="grid grid-cols-2 gap-2 px-1 pt-1">{items.map((asset) => <AssetDragCard key={asset.id} asset={asset} theme={theme} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />)}</div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无素材" className="pt-16" />}
+                {filtered.length ? (
+                    <div className="grid grid-cols-2 gap-2 px-1 pt-1">
+                        {items.map((asset) => (
+                            <AssetDragCard
+                                key={asset.id}
+                                asset={asset}
+                                theme={theme}
+                                onAssetDragStart={onAssetDragStart}
+                                onAssetDragEnd={onAssetDragEnd}
+                                onEdit={() => onEdit(asset)}
+                                onDelete={() => {
+                                    modal.confirm({
+                                        title: "删除素材",
+                                        content: `确定删除「${asset.title || "未命名素材"}」吗？删除后会从我的素材中移除。`,
+                                        okText: "删除",
+                                        okType: "danger",
+                                        cancelText: "取消",
+                                        centered: true,
+                                        onOk: () => {
+                                            removeAsset(asset.id);
+                                            message.success("素材已删除");
+                                        },
+                                    });
+                                }}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无素材" className="pt-16" />
+                )}
                 {filtered.length > ASSET_PAGE_SIZE ? <Pagination className="!mt-3 flex justify-center" size="small" current={page} pageSize={ASSET_PAGE_SIZE} total={filtered.length} showSizeChanger={false} onChange={setPage} /> : null}
             </div>
         </>
@@ -381,15 +442,64 @@ function LibraryAssetsTab({ theme, onAssetDragStart, onAssetDragEnd }: { theme: 
     );
 }
 
-function AssetDragCard({ asset, theme, onAssetDragStart, onAssetDragEnd }: { asset: Asset; theme: CanvasTheme; onAssetDragStart: (payload: InsertAssetPayload) => void; onAssetDragEnd: () => void }) {
-    return <DraggableAssetCard theme={theme} title={asset.title} payload={assetPayload(asset)} kind={asset.kind} imageUrl={asset.kind === "text" ? asset.coverUrl : asset.kind === "image" ? asset.coverUrl || asset.data.dataUrl : asset.kind === "video" ? asset.coverUrl || asset.data.url : ""} text={asset.kind === "text" ? asset.data.content : ""} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />;
+function AssetDragCard({
+    asset,
+    theme,
+    onAssetDragStart,
+    onAssetDragEnd,
+    onEdit,
+    onDelete,
+}: {
+    asset: Asset;
+    theme: CanvasTheme;
+    onAssetDragStart: (payload: InsertAssetPayload) => void;
+    onAssetDragEnd: () => void;
+    onEdit?: () => void;
+    onDelete?: () => void;
+}) {
+    return (
+        <DraggableAssetCard
+            theme={theme}
+            title={asset.title}
+            payload={assetPayload(asset)}
+            kind={asset.kind}
+            imageUrl={asset.kind === "text" ? asset.coverUrl : asset.kind === "image" ? asset.coverUrl || asset.data.dataUrl : asset.kind === "video" ? asset.coverUrl || asset.data.url : ""}
+            text={asset.kind === "text" ? asset.data.content : ""}
+            onAssetDragStart={onAssetDragStart}
+            onAssetDragEnd={onAssetDragEnd}
+            onEdit={onEdit}
+            onDelete={onDelete}
+        />
+    );
 }
 
 function LibraryAssetDragCard({ asset, theme, onAssetDragStart, onAssetDragEnd }: { asset: AssetLibraryItem; theme: CanvasTheme; onAssetDragStart: (payload: InsertAssetPayload) => void; onAssetDragEnd: () => void }) {
     return <DraggableAssetCard theme={theme} title={asset.title} payload={libraryPayload(asset)} kind={asset.type} imageUrl={asset.coverUrl || asset.url} text={asset.content || asset.description} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />;
 }
 
-function DraggableAssetCard({ theme, title, payload, kind, imageUrl, text, onAssetDragStart, onAssetDragEnd }: { theme: CanvasTheme; title: string; payload: InsertAssetPayload; kind: "text" | "image" | "video" | "audio"; imageUrl: string; text: string; onAssetDragStart: (payload: InsertAssetPayload) => void; onAssetDragEnd: () => void }) {
+function DraggableAssetCard({
+    theme,
+    title,
+    payload,
+    kind,
+    imageUrl,
+    text,
+    onAssetDragStart,
+    onAssetDragEnd,
+    onEdit,
+    onDelete,
+}: {
+    theme: CanvasTheme;
+    title: string;
+    payload: InsertAssetPayload;
+    kind: "text" | "image" | "video" | "audio";
+    imageUrl: string;
+    text: string;
+    onAssetDragStart: (payload: InsertAssetPayload) => void;
+    onAssetDragEnd: () => void;
+    onEdit?: () => void;
+    onDelete?: () => void;
+}) {
     return (
         <div
             draggable
@@ -404,6 +514,43 @@ function DraggableAssetCard({ theme, title, payload, kind, imageUrl, text, onAss
             style={{ borderColor: theme.node.stroke, background: theme.node.panel }}
         >
             {kind === "text" ? imageUrl ? <div className="flex size-full flex-col"><img src={imageUrl} alt={title} className="h-1/2 w-full object-cover" /><div className="h-1/2 overflow-hidden whitespace-pre-wrap break-words p-2.5 text-[11px] leading-snug opacity-80">{text}</div></div> : <div className="size-full overflow-hidden whitespace-pre-wrap break-words p-2.5 text-[11px] leading-snug opacity-80">{text}</div> : kind === "audio" ? <span className="grid size-full place-items-center"><Music2 className="size-8 opacity-45" /></span> : imageUrl ? kind === "video" ? <video src={imageUrl + "#t=0.1"} muted playsInline preload="metadata" className="size-full object-cover transition duration-300 group-hover:scale-[1.04]" /> : <img src={imageUrl} alt={title} className="size-full object-cover transition duration-300 group-hover:scale-[1.04]" /> : <span className="grid size-full place-items-center"><FileText className="size-8 opacity-45" /></span>}
+            {(onEdit || onDelete) ? (
+                <div
+                    className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                    }}
+                >
+                    {onEdit ? (
+                        <button
+                            type="button"
+                            title="编辑素材"
+                            className="flex size-5 items-center justify-center rounded bg-stone-900/80 text-stone-200 shadow backdrop-blur-sm transition hover:bg-stone-950 hover:text-white dark:bg-stone-800/85 dark:text-stone-300 dark:hover:bg-stone-700"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onEdit();
+                            }}
+                        >
+                            <Pencil className="size-2.5" />
+                        </button>
+                    ) : null}
+                    {onDelete ? (
+                        <button
+                            type="button"
+                            title="删除素材"
+                            className="flex size-5 items-center justify-center rounded bg-stone-900/80 text-stone-200 shadow backdrop-blur-sm transition hover:bg-red-600 hover:text-white dark:bg-stone-800/85 dark:text-stone-300 dark:hover:bg-red-600"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onDelete();
+                            }}
+                        >
+                            <Trash2 className="size-2.5" />
+                        </button>
+                    ) : null}
+                </div>
+            ) : null}
         </div>
     );
 }

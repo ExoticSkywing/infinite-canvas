@@ -13,7 +13,7 @@ type AICallLog struct {
 	DurationMs      int64  `json:"durationMs"`
 	Credits         float64 `json:"credits" gorm:"type:decimal(20,2)"`
 	RequestBody     string `json:"requestBody" gorm:"type:text"`
-	ResponseBody    string `json:"responseBody" gorm:"type:text"`
+	ResponseBody    string `json:"responseBody" gorm:"type:longtext"`
 	Error           string `json:"error" gorm:"type:text"`
 	CreatedAt       string `json:"createdAt" gorm:"index"`
 }

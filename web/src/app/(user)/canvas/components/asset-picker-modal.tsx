@@ -3,13 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { App, Button, Empty, Input, Modal, Pagination, Spin, Tabs, Tag } from "antd";
-import { ImagePlus, Plus, Search } from "lucide-react";
+import { Pencil, Plus, Search, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAssetStore, type Asset } from "@/stores/use-asset-store";
 import { fetchAssetLibrary, type AssetLibraryItem } from "@/services/api/assets";
-import { uploadAssetMediaFile } from "@/services/file-storage";
-import { uploadImage } from "@/services/image-storage";
+import { AssetFormModal } from "@/components/assets/asset-form-modal";
 import type { InsertAssetPayload } from "../types";
 
 export type { InsertAssetPayload } from "../types";
@@ -150,13 +149,35 @@ function LibraryTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => v
     );
 }
 
-function PickerCard({ title, kind, cover, loading, onClick }: { title: string; kind: string; cover: string; loading?: boolean; onClick: () => void }) {
+function PickerCard({
+    title,
+    kind,
+    cover,
+    loading,
+    onClick,
+    onEdit,
+    onDelete,
+}: {
+    title: string;
+    kind: string;
+    cover: string;
+    loading?: boolean;
+    onClick: () => void;
+    onEdit?: () => void;
+    onDelete?: () => void;
+}) {
     return (
-        <button
-            type="button"
+        <div
+            role="button"
+            tabIndex={0}
             className="group relative cursor-pointer overflow-hidden rounded-lg border border-stone-200 bg-white text-left transition hover:border-stone-400 hover:shadow-md dark:border-stone-700 dark:bg-stone-900 dark:hover:border-stone-500"
             onClick={onClick}
-            disabled={loading}
+            onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onClick();
+                }
+            }}
         >
             {cover ? (
                 <img src={cover} alt={title} className="aspect-[4/3] w-full object-cover" />
@@ -174,26 +195,57 @@ function PickerCard({ title, kind, cover, loading, onClick }: { title: string; k
                     <Spin size="small" />
                 </div>
             )}
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-stone-950/0 text-sm font-medium text-white opacity-0 transition group-hover:bg-stone-950/55 group-hover:opacity-100">插入</div>
-        </button>
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-stone-950/0 text-sm font-medium text-white opacity-0 transition group-hover:bg-stone-950/55 group-hover:opacity-100">
+                插入
+            </div>
+            {(onEdit || onDelete) ? (
+                <div
+                    className="absolute right-1.5 top-1.5 z-20 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {onEdit ? (
+                        <button
+                            type="button"
+                            title="编辑素材"
+                            className="flex size-6 items-center justify-center rounded-md bg-stone-900/80 text-stone-200 shadow-md backdrop-blur-sm transition hover:bg-stone-950 hover:text-white dark:bg-stone-800/80 dark:text-stone-300 dark:hover:bg-stone-700"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onEdit();
+                            }}
+                        >
+                            <Pencil className="size-3" />
+                        </button>
+                    ) : null}
+                    {onDelete ? (
+                        <button
+                            type="button"
+                            title="删除素材"
+                            className="flex size-6 items-center justify-center rounded-md bg-stone-900/80 text-stone-200 shadow-md backdrop-blur-sm transition hover:bg-red-600 hover:text-white dark:bg-stone-800/80 dark:text-stone-300 dark:hover:bg-red-600"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onDelete();
+                            }}
+                        >
+                            <Trash2 className="size-3" />
+                        </button>
+                    ) : null}
+                </div>
+            ) : null}
+        </div>
     );
 }
 
 function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => void }) {
-    const { message } = App.useApp();
+    const { modal, message } = App.useApp();
     const assets = useAssetStore((state) => state.assets);
-    const addAsset = useAssetStore((state) => state.addAsset);
+    const removeAsset = useAssetStore((state) => state.removeAsset);
     const [keyword, setKeyword] = useState("");
     const [kindFilter, setKindFilter] = useState("all");
     const [page, setPage] = useState(1);
-    const [createOpen, setCreateOpen] = useState(false);
-    const [createKind, setCreateKind] = useState<"text" | "image" | "video" | "audio">("image");
-    const [createTitle, setCreateTitle] = useState("");
-    const [createText, setCreateText] = useState("");
-    const [createUrl, setCreateUrl] = useState("");
-    const [saving, setSaving] = useState(false);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [formOpen, setFormOpen] = useState(false);
+    const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
 
     const filtered = useMemo(() => {
         const query = keyword.trim().toLowerCase();
@@ -224,115 +276,64 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
         }
     };
 
-    const resetCreateForm = () => {
-        setCreateTitle("");
-        setCreateText("");
-        setCreateUrl("");
-        setSelectedFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
+    const handleDelete = (asset: Asset) => {
+        modal.confirm({
+            title: "删除素材",
+            content: `确定删除「${asset.title || "未命名素材"}」吗？删除后会从我的素材中移除。`,
+            okText: "删除",
+            okType: "danger",
+            cancelText: "取消",
+            centered: true,
+            onOk: () => {
+                removeAsset(asset.id);
+                message.success("素材已删除");
+            },
+        });
     };
 
-    const createAsset = async () => {
-        const title = createTitle.trim();
-        if (!title) {
-            message.error("请输入素材名称");
-            return;
-        }
-        setSaving(true);
-        try {
-            if (createKind === "text") {
-                const content = createText.trim();
-                if (!content) {
-                    message.error("请输入文本内容");
-                    return;
-                }
-                addAsset({ kind: "text", title, coverUrl: "", tags: [], source: "素材选择器", data: { content } });
-            } else if (createKind === "image") {
-                if (!selectedFile && !createUrl.trim()) {
-                    message.error("请选择图片或填写图片 URL");
-                    return;
-                }
-                const stored = selectedFile ? await uploadImage(selectedFile) : null;
-                addAsset({
-                    kind: "image",
-                    title,
-                    coverUrl: stored?.url || createUrl.trim(),
-                    tags: [],
-                    source: "素材选择器",
-                    data: stored ? { dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType } : { dataUrl: createUrl.trim(), width: 0, height: 0, bytes: 0, mimeType: "image/*" },
-                });
-            } else if (createKind === "video") {
-                if (!selectedFile && !createUrl.trim()) {
-                    message.error("请选择视频或填写视频 URL");
-                    return;
-                }
-                const stored = selectedFile ? await uploadAssetMediaFile(selectedFile, "asset-video") : null;
-                addAsset({
-                    kind: "video",
-                    title,
-                    coverUrl: "",
-                    tags: [],
-                    source: "素材选择器",
-                    data: stored
-                        ? { url: stored.url, storageKey: stored.storageKey, width: stored.width || 0, height: stored.height || 0, bytes: stored.bytes, mimeType: stored.mimeType }
-                        : { url: createUrl.trim(), width: 0, height: 0, bytes: 0, mimeType: "video/mp4" },
-                });
-            } else {
-                if (!selectedFile && !createUrl.trim()) {
-                    message.error("请选择音频或填写音频 URL");
-                    return;
-                }
-                const stored = selectedFile ? await uploadAssetMediaFile(selectedFile, "asset-audio") : null;
-                addAsset({
-                    kind: "audio",
-                    title,
-                    coverUrl: "",
-                    tags: [],
-                    source: "素材选择器",
-                    data: stored ? { url: stored.url, storageKey: stored.storageKey, bytes: stored.bytes, mimeType: stored.mimeType, durationMs: stored.durationMs } : { url: createUrl.trim(), mimeType: "audio/mpeg" },
-                });
-            }
-            message.success("素材已新增");
-            setCreateOpen(false);
-            resetCreateForm();
-        } catch (error) {
-            message.error(error instanceof Error ? error.message : "新增素材失败");
-        } finally {
-            setSaving(false);
-        }
+    const handleOpenAdd = () => {
+        setEditingAsset(null);
+        setFormOpen(true);
+    };
+
+    const handleOpenEdit = (asset: Asset) => {
+        setEditingAsset(asset);
+        setFormOpen(true);
     };
 
     return (
         <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-                <Input
-                    className="w-56"
-                    size="small"
-                    prefix={<Search className="size-3.5 text-stone-400" />}
-                    placeholder="搜索素材"
-                    value={keyword}
-                    allowClear
-                    onChange={(e) => {
-                        setPage(1);
-                        setKeyword(e.target.value);
-                    }}
-                />
-                <div className="flex gap-1.5">
-                    {kindOptions.map((opt) => (
-                        <Tag.CheckableTag
-                            key={opt.value}
-                            checked={kindFilter === opt.value}
-                            className={cn("prompt-filter-tag", kindFilter === opt.value && "is-active")}
-                            onChange={() => {
-                                setPage(1);
-                                setKindFilter(opt.value);
-                            }}
-                        >
-                            {opt.label}
-                        </Tag.CheckableTag>
-                    ))}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                    <Input
+                        className="w-56"
+                        size="small"
+                        prefix={<Search className="size-3.5 text-stone-400" />}
+                        placeholder="搜索素材"
+                        value={keyword}
+                        allowClear
+                        onChange={(e) => {
+                            setPage(1);
+                            setKeyword(e.target.value);
+                        }}
+                    />
+                    <div className="flex gap-1.5">
+                        {kindOptions.map((opt) => (
+                            <Tag.CheckableTag
+                                key={opt.value}
+                                checked={kindFilter === opt.value}
+                                className={cn("prompt-filter-tag", kindFilter === opt.value && "is-active")}
+                                onChange={() => {
+                                    setPage(1);
+                                    setKindFilter(opt.value);
+                                }}
+                            >
+                                {opt.label}
+                            </Tag.CheckableTag>
+                        ))}
+                    </div>
                 </div>
-                <Button size="small" icon={<Plus className="size-3.5" />} onClick={() => setCreateOpen(true)}>
+                <Button size="small" icon={<Plus className="size-3.5" />} onClick={handleOpenAdd}>
                     新增素材
                 </Button>
             </div>
@@ -340,7 +341,15 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
             {visible.length ? (
                 <div className="grid grid-cols-4 gap-3">
                     {visible.map((asset) => (
-                        <PickerCard key={asset.id} title={asset.title} kind={asset.kind} cover={asset.coverUrl || (asset.kind === "image" ? asset.data.dataUrl : "")} onClick={() => handleInsert(asset)} />
+                        <PickerCard
+                            key={asset.id}
+                            title={asset.title}
+                            kind={asset.kind}
+                            cover={asset.coverUrl || (asset.kind === "image" ? asset.data.dataUrl : "")}
+                            onClick={() => handleInsert(asset)}
+                            onEdit={() => handleOpenEdit(asset)}
+                            onDelete={() => handleDelete(asset)}
+                        />
                     ))}
                 </div>
             ) : (
@@ -352,45 +361,15 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
                     <Pagination size="small" current={page} pageSize={PAGE_SIZE} total={filtered.length} onChange={setPage} showSizeChanger={false} />
                 </div>
             )}
-            <Modal
-                title="新增素材"
-                open={createOpen}
-                onCancel={() => {
-                    setCreateOpen(false);
-                    resetCreateForm();
+
+            <AssetFormModal
+                open={formOpen}
+                asset={editingAsset}
+                onClose={() => {
+                    setFormOpen(false);
+                    setEditingAsset(null);
                 }}
-                onOk={() => void createAsset()}
-                okText="保存"
-                confirmLoading={saving}
-                destroyOnHidden
-            >
-                <div className="space-y-3 pt-2">
-                    <div className="flex gap-2">
-                        {[
-                            { value: "image" as const, label: "图片" },
-                            { value: "text" as const, label: "文本" },
-                            { value: "video" as const, label: "视频" },
-                            { value: "audio" as const, label: "音频" },
-                        ].map((item) => (
-                            <Tag.CheckableTag key={item.value} checked={createKind === item.value} className={cn("prompt-filter-tag", createKind === item.value && "is-active")} onChange={() => setCreateKind(item.value)}>
-                                {item.label}
-                            </Tag.CheckableTag>
-                        ))}
-                    </div>
-                    <Input value={createTitle} placeholder="素材名称" onChange={(event) => setCreateTitle(event.target.value)} />
-                    {createKind === "text" ? (
-                        <Input.TextArea value={createText} autoSize={{ minRows: 5, maxRows: 10 }} placeholder="文本内容" onChange={(event) => setCreateText(event.target.value)} />
-                    ) : (
-                        <div className="space-y-2">
-                            <input ref={fileInputRef} type="file" accept={createKind === "image" ? "image/*" : createKind === "video" ? "video/*" : "audio/mpeg,audio/wav,audio/x-wav,.mp3,.wav"} className="hidden" onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
-                            <Button icon={<ImagePlus className="size-4" />} onClick={() => fileInputRef.current?.click()}>
-                                {selectedFile ? selectedFile.name : createKind === "image" ? "选择图片" : createKind === "video" ? "选择视频" : "选择音频"}
-                            </Button>
-                            <Input value={createUrl} placeholder={createKind === "image" ? "图片 URL" : createKind === "video" ? "视频 URL" : "音频 URL"} onChange={(event) => setCreateUrl(event.target.value)} />
-                        </div>
-                    )}
-                </div>
-            </Modal>
+            />
         </div>
     );
 }

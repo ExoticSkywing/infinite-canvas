@@ -3,8 +3,8 @@ package model
 // Prompt 提示词记录。
 type Prompt struct {
 	ID        string   `json:"id" gorm:"primaryKey"`
-	Title     string   `json:"title"`
-	CoverURL  string   `json:"coverUrl"`
+	Title     string   `json:"title" gorm:"type:text"`
+	CoverURL  string   `json:"coverUrl" gorm:"type:text"`
 	Prompt    string   `json:"prompt" gorm:"type:longtext"`
 	Tags      []string `json:"tags" gorm:"type:text;serializer:json"`
 	Category  string   `json:"category" gorm:"index"`

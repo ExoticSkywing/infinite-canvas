@@ -52,9 +52,9 @@ function saveConfig() {
 
 function findSession(clientId) {
     if (!clientId) {
-        const connected = [...sessions.values()].filter((session) => session.events && session.canvasId);
-        if (connected.length !== 1) throw new Error("请只连接一个画布，或为 MCP 设置 CANVAS_AGENT_CLIENT_ID");
-        return connected[0];
+        const connected = [...sessions.values()].filter((session) => session.events && !session.events.destroyed && !session.events.writableEnded && session.canvasId);
+        if (connected.length === 0) throw new Error("请先在网页连接画布");
+        return connected[connected.length - 1];
     }
     const session = sessions.get(clientId);
     if (!session) throw new Error("画布尚未连接");

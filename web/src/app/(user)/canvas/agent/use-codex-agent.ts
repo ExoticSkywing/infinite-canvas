@@ -24,7 +24,7 @@ type ActiveRun = {
     finish: (error?: Error) => void;
 };
 const CONNECTION_KEY = "canvas-codex-connection";
-const defaultConnection = { endpoint: "http://127.0.0.1:3210", token: "" };
+const defaultConnection = { endpoint: "/api/agent", token: "" };
 const agentTools = [...CANVAS_AGENT_TOOLS, CANVAS_AGENT_SKILL_FILE_TOOL].map(({ function: tool }) => ({ name: tool.name, description: tool.description, inputSchema: tool.parameters }));
 const stopped = () => new DOMException("Agent 已停止", "AbortError");
 
@@ -82,7 +82,12 @@ export function useCodexAgent(options: {
     useEffect(() => {
         try {
             const stored = JSON.parse(localStorage.getItem(CONNECTION_KEY) || "null");
-            if (stored && typeof stored.endpoint === "string" && typeof stored.token === "string") setConnectionState(stored);
+            if (stored && typeof stored.endpoint === "string" && typeof stored.token === "string") {
+                if (typeof window !== "undefined" && !["127.0.0.1", "localhost"].includes(window.location.hostname) && ["http://127.0.0.1:3210", "http://localhost:3210"].includes(stored.endpoint)) {
+                    stored.endpoint = "/api/agent";
+                }
+                setConnectionState(stored);
+            }
         } catch { /* 本地配置不可用时使用默认值 */ }
         const bootstrap = () => {
             const hash = window.location.hash.slice(1);

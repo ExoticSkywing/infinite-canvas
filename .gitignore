@@ -11,3 +11,5 @@ web/public/InfiniteCanvas-ComfyBridge*
 .DS_Store
 .idea
 /server
+dev-*.sh
+web/public/rocket*.png
