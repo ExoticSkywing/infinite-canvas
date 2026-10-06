@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/tigerowo/infinite-canvas/model"
 	"gorm.io/gorm"
@@ -129,11 +130,35 @@ func ReplacePromptCategory(category model.PromptCategory, items []model.Prompt) 
 	})
 }
 
+// RemoteCategoryCodes 返回所有上游/远程同步分类编码。
+func RemoteCategoryCodes() []string {
+	var codes []string
+	for _, item := range promptCategories {
+		if item.Remote {
+			codes = append(codes, item.Category)
+		}
+	}
+	return codes
+}
+
 // applyPromptFilters 应用提示词列表的搜索条件。
 func applyPromptFilters(tx *gorm.DB, q model.Query) *gorm.DB {
+	if q.Scope == "gallery" {
+		remotes := append(RemoteCategoryCodes(), "system")
+		if len(remotes) > 0 {
+			tx = tx.Where("category NOT IN ?", remotes)
+		}
+	}
 	if q.Keyword != "" {
-		like := "%" + q.Keyword + "%"
-		tx = tx.Where("title LIKE ? OR prompt LIKE ?", like, like)
+		words := strings.Fields(q.Keyword)
+		for _, word := range words {
+			like := "%" + word + "%"
+			if tx.Dialector.Name() == "postgres" {
+				tx = tx.Where("title LIKE ? OR prompt LIKE ? OR tags::text LIKE ? OR category LIKE ?", like, like, like, like)
+			} else {
+				tx = tx.Where("title LIKE ? OR prompt LIKE ? OR tags LIKE ? OR category LIKE ?", like, like, like, like)
+			}
+		}
 	}
 	if isActivePromptOption(q.Category) {
 		tx = tx.Where("category = ?", q.Category)

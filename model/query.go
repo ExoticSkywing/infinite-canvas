@@ -9,6 +9,7 @@ type Query struct {
 	Tags     []string
 	Category string
 	Type     string
+	Scope    string
 	Page     int
 	PageSize int
 }

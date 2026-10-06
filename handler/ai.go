@@ -166,8 +166,8 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		return
 	}
 	body, contentType, upstreamPath = prepared.body, prepared.contentType, prepared.path
-	if path == "/images/generations" {
-		body = alignImageGenerationSize(body, contentType)
+	if path == "/images/generations" || path == "/images/edits" {
+		body = alignImageSizePayload(body, contentType, path == "/images/edits")
 	}
 	request, err := http.NewRequest(http.MethodPost, service.BuildModelChannelURL(channel, upstreamPath), bytes.NewReader(body))
 	if err != nil {
@@ -573,7 +573,66 @@ func (err *aiError) Error() string {
 }
 
 
-func alignImageGenerationSize(body []byte, contentType string) []byte {
+func alignDimensionSize(size string, isEdit bool) string {
+	if size == "" || size == "auto" {
+		return size
+	}
+	if isEdit {
+		// OpenAI / CCH edits whitelist: auto, 1024x1024, 1536x1024, 1024x1536
+		switch size {
+		case "1024x1024", "1536x1024", "1024x1536":
+			return size
+		}
+		parts := strings.Split(size, "x")
+		if len(parts) != 2 {
+			return size
+		}
+		var w, h float64
+		_, errW := fmt.Sscanf(parts[0], "%f", &w)
+		_, errH := fmt.Sscanf(parts[1], "%f", &h)
+		if errW != nil || errH != nil || w <= 0 || h <= 0 {
+			return size
+		}
+		ratio := w / h
+		if ratio > 1.15 {
+			return "1536x1024"
+		} else if ratio >= 0.85 {
+			return "1024x1024"
+		} else {
+			return "1024x1536"
+		}
+	}
+
+	// CCH generations whitelist: 1024x1024, 1536x1024, 1024x1536, 1792x1024, 1024x1792, 256x256, 512x512
+	switch size {
+	case "1024x1024", "1536x1024", "1024x1536", "1792x1024", "1024x1792", "256x256", "512x512":
+		return size
+	}
+	parts := strings.Split(size, "x")
+	if len(parts) != 2 {
+		return size
+	}
+	var w, h float64
+	_, errW := fmt.Sscanf(parts[0], "%f", &w)
+	_, errH := fmt.Sscanf(parts[1], "%f", &h)
+	if errW != nil || errH != nil || w <= 0 || h <= 0 {
+		return size
+	}
+	ratio := w / h
+	if ratio >= 1.6 { // 16:9, 21:9
+		return "1792x1024"
+	} else if ratio > 1.15 { // 4:3, 3:2
+		return "1536x1024"
+	} else if ratio >= 0.85 { // 1:1
+		return "1024x1024"
+	} else if ratio >= 0.62 { // 3:4, 2:3
+		return "1024x1536"
+	} else { // 9:16, 1:3
+		return "1024x1792"
+	}
+}
+
+func alignImageSizePayload(body []byte, contentType string, isEdit bool) []byte {
 	if !strings.Contains(contentType, "application/json") || len(body) == 0 {
 		return body
 	}
@@ -585,36 +644,7 @@ func alignImageGenerationSize(body []byte, contentType string) []byte {
 	if !ok || size == "" || size == "auto" {
 		return body
 	}
-	// CCH whitelist: 1024x1024, 1536x1024, 1024x1536, 1792x1024, 1024x1792, 256x256, 512x512
-	switch size {
-	case "1024x1024", "1536x1024", "1024x1536", "1792x1024", "1024x1792", "256x256", "512x512":
-		return body
-	}
-	parts := strings.Split(size, "x")
-	if len(parts) != 2 {
-		return body
-	}
-	var w, h float64
-	_, errW := fmt.Sscanf(parts[0], "%f", &w)
-	_, errH := fmt.Sscanf(parts[1], "%f", &h)
-	if errW != nil || errH != nil || w <= 0 || h <= 0 {
-		return body
-	}
-	ratio := w / h
-	var newSize string
-	if ratio >= 1.6 { // 16:9, 21:9
-		newSize = "1792x1024"
-	} else if ratio > 1.15 { // 4:3, 3:2
-		newSize = "1536x1024"
-	} else if ratio >= 0.85 { // 1:1
-		newSize = "1024x1024"
-	} else if ratio >= 0.62 { // 3:4, 2:3
-		newSize = "1024x1536"
-	} else { // 9:16, 1:3
-		newSize = "1024x1792"
-	}
-
-	payload["size"] = newSize
+	payload["size"] = alignDimensionSize(size, isEdit)
 	modified, err := json.Marshal(payload)
 	if err != nil {
 		return body

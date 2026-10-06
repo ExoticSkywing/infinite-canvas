@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tigerowo/infinite-canvas/model"
 	"github.com/tigerowo/infinite-canvas/service"
 )
@@ -292,7 +293,78 @@ func runCanvasImageTask(task model.CanvasImageTask, user model.AuthUser, body []
 	task.Height = 0
 	task.Error = ""
 	task.ErrorDetail = ""
+
+	ctx := service.WithUser(context.Background(), user)
+	if persistedURL, storageKey, persistedBytes, persistedMime, ok := persistCanvasTaskImage(ctx, imageURLs[0], mimeType); ok {
+		task.ImageURL = persistedURL
+		task.StorageKey = storageKey
+		if persistedBytes > 0 {
+			task.Bytes = persistedBytes
+		}
+		if persistedMime != "" {
+			task.MimeType = persistedMime
+		}
+		if collectAll && len(imageURLs) > 1 {
+			persistedURLs := make([]string, len(imageURLs))
+			persistedURLs[0] = persistedURL
+			for i := 1; i < len(imageURLs); i++ {
+				if pURL, _, _, _, pOK := persistCanvasTaskImage(ctx, imageURLs[i], mimeType); pOK {
+					persistedURLs[i] = pURL
+				} else {
+					persistedURLs[i] = imageURLs[i]
+				}
+			}
+			task.ImageURLs = persistedURLs
+		}
+	}
+
 	_, _ = service.SaveCanvasImageTask(task)
+}
+
+func persistCanvasTaskImage(ctx context.Context, imageURL string, fallbackMime string) (string, string, int64, string, bool) {
+	if strings.HasPrefix(imageURL, "/api/files/") {
+		return imageURL, "", 0, fallbackMime, false
+	}
+	var data []byte
+	mimeType := fallbackMime
+	if strings.HasPrefix(imageURL, "data:image/") {
+		var err error
+		data, mimeType, err = imageCandidateBytes(imageURL)
+		if err != nil || len(data) == 0 {
+			return imageURL, "", 0, fallbackMime, false
+		}
+	} else if strings.HasPrefix(imageURL, "http://") || strings.HasPrefix(imageURL, "https://") {
+		client := &http.Client{Timeout: 60 * time.Second}
+		resp, err := client.Get(imageURL)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			if resp != nil {
+				resp.Body.Close()
+			}
+			return imageURL, "", 0, fallbackMime, false
+		}
+		defer resp.Body.Close()
+		data, err = io.ReadAll(resp.Body)
+		if err != nil || len(data) == 0 {
+			return imageURL, "", 0, fallbackMime, false
+		}
+		ct := resp.Header.Get("Content-Type")
+		if ct != "" && !strings.Contains(ct, "text/") && !strings.Contains(ct, "json") {
+			mimeType = strings.TrimSpace(strings.Split(ct, ";")[0])
+		}
+	} else {
+		return imageURL, "", 0, fallbackMime, false
+	}
+
+	if mimeType == "" {
+		mimeType = http.DetectContentType(data)
+	}
+	filename := "canvas-image-" + uuid.NewString()
+	uploaded, err := service.UploadStorageObject(ctx, filename, mimeType, data)
+	if err != nil {
+		log.Printf("persist canvas task image to cloud storage failed: %v", err)
+		return imageURL, "", int64(len(data)), mimeType, false
+	}
+	return uploaded.URL, uploaded.StorageKey, uploaded.Bytes, uploaded.MimeType, true
 }
 
 func runCanvasAudioTask(task model.CanvasAudioTask, user model.AuthUser, body []byte, contentType string, channelID string, userChannelID string) {
@@ -452,6 +524,9 @@ func stripCanvasTaskMultipartFields(raw []byte, contentType string, normalizeIma
 			continue
 		}
 		for _, value := range values {
+			if key == "size" {
+				value = alignDimensionSize(value, isEdit)
+			}
 			_ = writer.WriteField(key, value)
 		}
 	}
