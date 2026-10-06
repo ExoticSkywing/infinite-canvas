@@ -110,16 +110,16 @@ export function PromptDetailDialog({
                         <X className="size-4" />
                     </button>
 
-                    {/* 左侧：沉浸式媒体大图展厅 */}
-                    <div className="relative flex flex-1 items-center justify-center bg-stone-950 p-6 overflow-hidden select-none">
+                    {/* 左侧：自适应深浅模式媒体大图展厅 */}
+                    <div className="relative flex flex-1 items-center justify-center bg-stone-100/90 dark:bg-[#0c0a09] p-6 overflow-hidden select-none transition-colors duration-200">
                         <img
                             src={prompt.coverUrl}
                             alt={prompt.title}
-                            className="max-h-full max-w-full rounded-2xl object-contain shadow-2xl transition duration-300"
+                            className="max-h-full max-w-full rounded-2xl object-contain shadow-xl dark:shadow-2xl transition duration-300"
                         />
                         {/* 左上角分类/格式胶囊徽章 */}
                         <div className="absolute left-6 top-6 flex items-center gap-2">
-                            <span className="rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white/90 backdrop-blur-md border border-white/10 shadow-sm">
+                            <span className="rounded-full bg-white/80 dark:bg-black/60 px-3 py-1 text-xs font-medium text-stone-800 dark:text-white/90 backdrop-blur-md border border-stone-200/70 dark:border-white/10 shadow-xs">
                                 {prompt.category || "作品展示"}
                             </span>
                         </div>
