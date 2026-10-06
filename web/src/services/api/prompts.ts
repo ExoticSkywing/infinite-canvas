@@ -22,13 +22,14 @@ export type PromptListResponse = {
     total: number;
 };
 
-export async function fetchPrompts({ keyword = "", tag = [], category = ALL_PROMPTS_OPTION, page, pageSize }: { keyword?: string; tag?: string[]; category?: string; page?: number; pageSize?: number } = {}) {
+export async function fetchPrompts({ keyword = "", tag = [], category = ALL_PROMPTS_OPTION, scope = "", page, pageSize }: { keyword?: string; tag?: string[]; category?: string; scope?: string; page?: number; pageSize?: number } = {}) {
     return apiGet<PromptListResponse>(
         "/api/prompts",
         compactApiParams({
             ...(keyword ? { keyword } : {}),
             ...(tag.length ? { tag } : {}),
             ...(category !== ALL_PROMPTS_OPTION ? { category } : {}),
+            ...(scope ? { scope } : {}),
             ...(page ? { page } : {}),
             ...(pageSize ? { pageSize } : {}),
         }),

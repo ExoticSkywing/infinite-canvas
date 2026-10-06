@@ -23,7 +23,7 @@ export const navigationTools = [
     },
     {
         slug: "prompts",
-        label: "提示词库",
+        label: "画廊",
         icon: FileText,
     },
     {

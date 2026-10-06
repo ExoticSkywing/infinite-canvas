@@ -50,6 +50,17 @@ function toPendingAgentAsset(payload: InsertAssetPayload, label: string): Pendin
     return { nodeId, payload, reference };
 }
 
+const REMOTE_CATEGORIES = new Set([
+    "system",
+    "gpt-image-2-prompts",
+    "awesome-gpt-image",
+    "awesome-gpt4o-image-prompts",
+    "xianyu-awesome-gptimage2",
+    "youmind-gpt-image-2",
+    "youmind-nano-banana-pro",
+    "davidwu-gpt-image2-prompts",
+]);
+
 export default function IndexPage() {
     const { message } = App.useApp();
     const router = useRouter();
@@ -76,8 +87,8 @@ export default function IndexPage() {
     const pendingAssetCountsRef = useRef<Record<InsertAssetPayload["kind"], number>>({ text: 0, image: 0, video: 0, audio: 0 });
 
     useEffect(() => {
-        void fetchPrompts({ pageSize: 12 })
-            .then((data) => setPromptShowcase(data.items))
+        void fetchPrompts({ pageSize: 12, scope: "gallery" })
+            .then((data) => setPromptShowcase(data.items.filter((item) => !REMOTE_CATEGORIES.has(item.category))))
             .catch((error) => message.error(error instanceof Error ? error.message : "获取提示词失败"));
     }, [message]);
 
@@ -172,7 +183,7 @@ export default function IndexPage() {
                             <p className="mt-3 text-base leading-7 text-stone-500 dark:text-stone-400">收藏稳定出图的提示词、参考风格和结果图片，让下一次创作从已有经验开始。</p>
                         </div>
                         <Button type="link" href="/prompts" className="justify-self-center md:justify-self-end" icon={<ArrowRight className="size-4" />} iconPlacement="end">
-                            提示词库
+                            画廊
                         </Button>
                     </div>
                     <div className="grid auto-rows-[210px] gap-4 md:grid-cols-4">
