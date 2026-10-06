@@ -6,6 +6,7 @@ import { Button, Modal, Tag, Input, message, Avatar, Tooltip } from "antd";
 
 import { formatPromptDate, type Prompt } from "@/services/api/prompts";
 import { useUserStore } from "@/stores/use-user-store";
+import { useThemeStore } from "@/stores/use-theme-store";
 
 const COMMUNITY_UNLOCK_KEY = "infinite-canvas:community-unlocked";
 
@@ -27,6 +28,8 @@ export function PromptDetailDialog({
     const [isSaved, setIsSaved] = useState(false);
     const user = useUserStore((state) => state.user);
     const isAdmin = Boolean(user && user.role === "admin");
+    const theme = useThemeStore((state) => state.theme);
+    const isDark = theme === "dark";
 
     useEffect(() => {
         try {
@@ -84,6 +87,8 @@ export function PromptDetailDialog({
             closable={false}
             width={1120}
             centered
+            wrapClassName={isDark ? "dark" : ""}
+            rootClassName={isDark ? "dark" : ""}
             styles={{
                 content: {
                     padding: 0,
