@@ -3,7 +3,7 @@
 import { memo, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { App, Empty, Input, Pagination, Select, Spin } from "antd";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, ChevronRight, Clapperboard, Eye, FileText, Group, Image as ImageIcon, Music2, Pencil, Plus, Search, Settings2, Trash2, Type, Video } from "lucide-react";
+import { BookOpen, ChevronRight, Clapperboard, Copy, Eye, FileText, Group, Image as ImageIcon, Music2, Pencil, Plus, Search, Settings2, Sparkles, Trash2, Type, Video } from "lucide-react";
 import { motion } from "motion/react";
 
 import { AssetFormModal } from "@/components/assets/asset-form-modal";
@@ -41,6 +41,8 @@ type Props = {
     onAssetDragStart: (payload: InsertAssetPayload) => void;
     onAssetDragEnd: () => void;
     onInsertAsset: (payload: InsertAssetPayload) => void;
+    onPublishAssetToGallery?: (asset: Asset) => void;
+    onPublishPromptToGallery?: (prompt: Prompt) => void;
 };
 
 const NODE_TYPE_ICON = {
@@ -91,7 +93,7 @@ const STATUS_COLOR: Record<string, string> = {
     error: "#ef4444",
 };
 
-export function CanvasSidePanel({ nodes, selectedNodeIds, open, width, onWidthChange, onFocusNode, onAssetDragStart, onAssetDragEnd, onInsertAsset }: Props) {
+export function CanvasSidePanel({ nodes, selectedNodeIds, open, width, onWidthChange, onFocusNode, onAssetDragStart, onAssetDragEnd, onInsertAsset, onPublishAssetToGallery }: Props) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const [tab, setTab] = useState<PanelTab>("canvas");
     const [mounted, setMounted] = useState(open);
@@ -148,15 +150,15 @@ export function CanvasSidePanel({ nodes, selectedNodeIds, open, width, onWidthCh
                 <div className="flex items-center gap-5 px-4 pt-3.5">
                     <PanelTabButton label="画布" active={tab === "canvas"} theme={theme} onClick={() => setTab("canvas")} />
                     <PanelTabButton label="资产" active={tab === "assets"} theme={theme} onClick={() => setTab("assets")} />
-                    <PanelTabButton label="提示词库" active={tab === "prompts"} theme={theme} onClick={() => setTab("prompts")} />
+                    <PanelTabButton label="画廊" active={tab === "prompts"} theme={theme} onClick={() => setTab("prompts")} />
                 </div>
                 <div className="mt-2 min-h-0 flex-1 overflow-hidden">
                     {tab === "canvas" ? (
                         <CanvasNodesTab nodes={nodes} selectedNodeIds={selectedNodeIds} onFocusNode={onFocusNode} theme={theme} />
                     ) : tab === "assets" ? (
-                        <CanvasAssetsTab theme={theme} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />
+                        <CanvasAssetsTab theme={theme} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} onPublishAssetToGallery={onPublishAssetToGallery} />
                     ) : (
-                        <CanvasPromptsTab theme={theme} onInsert={onInsertAsset} />
+                        <CanvasPromptsTab theme={theme} onInsert={onInsertAsset} onPublishToGallery={onPublishPromptToGallery} />
                     )}
                 </div>
                 <button type="button" className="absolute inset-y-0 right-0 z-40 w-4 translate-x-1/2 cursor-col-resize" onPointerDown={startResize} aria-label="调整左侧面板宽度" />
@@ -263,7 +265,7 @@ function CanvasNodesTab({ nodes, selectedNodeIds, onFocusNode, theme }: { nodes:
     );
 }
 
-const CanvasAssetsTab = memo(function CanvasAssetsTab({ theme, onAssetDragStart, onAssetDragEnd }: { theme: CanvasTheme; onAssetDragStart: (payload: InsertAssetPayload) => void; onAssetDragEnd: () => void }) {
+const CanvasAssetsTab = memo(function CanvasAssetsTab({ theme, onAssetDragStart, onAssetDragEnd, onPublishAssetToGallery }: { theme: CanvasTheme; onAssetDragStart: (payload: InsertAssetPayload) => void; onAssetDragEnd: () => void; onPublishAssetToGallery?: (asset: Asset) => void }) {
     const [source, setSource] = useState<"mine" | "library">("mine");
     const [formOpen, setFormOpen] = useState(false);
     const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
@@ -285,7 +287,7 @@ const CanvasAssetsTab = memo(function CanvasAssetsTab({ theme, onAssetDragStart,
                 <AssetSourceTab label="素材库" active={source === "library"} theme={theme} onClick={() => setSource("library")} />
             </div>
             {source === "mine" ? (
-                <MyAssetsTab theme={theme} onAdd={handleOpenAdd} onEdit={handleOpenEdit} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />
+                <MyAssetsTab theme={theme} onAdd={handleOpenAdd} onEdit={handleOpenEdit} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} onPublishAssetToGallery={onPublishAssetToGallery} />
             ) : (
                 <LibraryAssetsTab theme={theme} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />
             )}
@@ -316,14 +318,19 @@ function MyAssetsTab({
     onEdit,
     onAssetDragStart,
     onAssetDragEnd,
+    onPublishAssetToGallery,
+    onPublishPromptToGallery,
 }: {
     theme: CanvasTheme;
     onAdd: () => void;
     onEdit: (asset: Asset) => void;
     onAssetDragStart: (payload: InsertAssetPayload) => void;
     onAssetDragEnd: () => void;
+    onPublishAssetToGallery?: (asset: Asset) => void;
+    onPublishPromptToGallery?: (prompt: Prompt) => void;
 }) {
     const { modal, message } = App.useApp();
+    const copyText = useCopyText();
     const removeAsset = useAssetStore((state) => state.removeAsset);
     const assets = useAssetStore((state) => state.assets);
     const [keyword, setKeyword] = useState("");
@@ -375,6 +382,8 @@ function MyAssetsTab({
                                 onAssetDragStart={onAssetDragStart}
                                 onAssetDragEnd={onAssetDragEnd}
                                 onEdit={() => onEdit(asset)}
+                                onPublishGallery={onPublishAssetToGallery}
+                                onCopyPrompt={(prompt) => copyText(prompt, "已复制生成提示词")}
                                 onDelete={() => {
                                     modal.confirm({
                                         title: "删除素材",
@@ -449,6 +458,8 @@ function AssetDragCard({
     onAssetDragEnd,
     onEdit,
     onDelete,
+    onCopyPrompt,
+    onPublishGallery,
 }: {
     asset: Asset;
     theme: CanvasTheme;
@@ -456,7 +467,10 @@ function AssetDragCard({
     onAssetDragEnd: () => void;
     onEdit?: () => void;
     onDelete?: () => void;
+    onCopyPrompt?: (prompt: string) => void;
+    onPublishGallery?: (asset: Asset) => void;
 }) {
+    const promptText = typeof asset.metadata?.prompt === "string" ? asset.metadata.prompt : "";
     return (
         <DraggableAssetCard
             theme={theme}
@@ -465,10 +479,13 @@ function AssetDragCard({
             kind={asset.kind}
             imageUrl={asset.kind === "text" ? asset.coverUrl : asset.kind === "image" ? asset.coverUrl || asset.data.dataUrl : asset.kind === "video" ? asset.coverUrl || asset.data.url : ""}
             text={asset.kind === "text" ? asset.data.content : ""}
+            prompt={promptText}
             onAssetDragStart={onAssetDragStart}
             onAssetDragEnd={onAssetDragEnd}
             onEdit={onEdit}
             onDelete={onDelete}
+            onCopyPrompt={onCopyPrompt}
+            onPublishGallery={onPublishGallery ? () => onPublishGallery(asset) : undefined}
         />
     );
 }
@@ -484,10 +501,13 @@ function DraggableAssetCard({
     kind,
     imageUrl,
     text,
+    prompt,
     onAssetDragStart,
     onAssetDragEnd,
     onEdit,
     onDelete,
+    onCopyPrompt,
+    onPublishGallery,
 }: {
     theme: CanvasTheme;
     title: string;
@@ -495,10 +515,13 @@ function DraggableAssetCard({
     kind: "text" | "image" | "video" | "audio";
     imageUrl: string;
     text: string;
+    prompt?: string;
     onAssetDragStart: (payload: InsertAssetPayload) => void;
     onAssetDragEnd: () => void;
     onEdit?: () => void;
     onDelete?: () => void;
+    onCopyPrompt?: (prompt: string) => void;
+    onPublishGallery?: () => void;
 }) {
     return (
         <div
@@ -514,13 +537,41 @@ function DraggableAssetCard({
             style={{ borderColor: theme.node.stroke, background: theme.node.panel }}
         >
             {kind === "text" ? imageUrl ? <div className="flex size-full flex-col"><img src={imageUrl} alt={title} className="h-1/2 w-full object-cover" /><div className="h-1/2 overflow-hidden whitespace-pre-wrap break-words p-2.5 text-[11px] leading-snug opacity-80">{text}</div></div> : <div className="size-full overflow-hidden whitespace-pre-wrap break-words p-2.5 text-[11px] leading-snug opacity-80">{text}</div> : kind === "audio" ? <span className="grid size-full place-items-center"><Music2 className="size-8 opacity-45" /></span> : imageUrl ? kind === "video" ? <video src={imageUrl + "#t=0.1"} muted playsInline preload="metadata" className="size-full object-cover transition duration-300 group-hover:scale-[1.04]" /> : <img src={imageUrl} alt={title} className="size-full object-cover transition duration-300 group-hover:scale-[1.04]" /> : <span className="grid size-full place-items-center"><FileText className="size-8 opacity-45" /></span>}
-            {(onEdit || onDelete) ? (
+            {(onEdit || onDelete || onPublishGallery || (prompt && onCopyPrompt)) ? (
                 <div
                     className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
                     onClick={(e) => {
                         e.stopPropagation();
                     }}
                 >
+                    {onPublishGallery ? (
+                        <button
+                            type="button"
+                            title="一键发布到画廊"
+                            className="flex size-5 items-center justify-center rounded border border-amber-200/90 bg-amber-50/90 text-amber-600 shadow-sm backdrop-blur-sm transition hover:border-amber-300 hover:bg-amber-100 hover:text-amber-700 dark:border-amber-700/80 dark:bg-amber-950/80 dark:text-amber-300 dark:hover:border-amber-600 dark:hover:bg-amber-900"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onPublishGallery();
+                            }}
+                        >
+                            <Sparkles className="size-2.5" />
+                        </button>
+                    ) : null}
+                    {prompt && onCopyPrompt ? (
+                        <button
+                            type="button"
+                            title="复制生成提示词"
+                            className="flex size-5 items-center justify-center rounded border border-stone-200/90 bg-white/90 text-stone-600 shadow-sm backdrop-blur-sm transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-600 dark:border-stone-700/80 dark:bg-stone-800/90 dark:text-stone-300 dark:hover:border-sky-900/50 dark:hover:bg-sky-950/60 dark:hover:text-sky-400"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onCopyPrompt(prompt);
+                            }}
+                        >
+                            <Copy className="size-2.5" />
+                        </button>
+                    ) : null}
                     {onEdit ? (
                         <button
                             type="button"
@@ -569,7 +620,7 @@ function libraryPayload(asset: AssetLibraryItem): InsertAssetPayload {
     return { kind: "audio", url: asset.url, title: asset.title, assetId: asset.id, source: "library" };
 }
 
-const CanvasPromptsTab = memo(function CanvasPromptsTab({ theme, onInsert }: { theme: CanvasTheme; onInsert: (payload: InsertAssetPayload) => void }) {
+const CanvasPromptsTab = memo(function CanvasPromptsTab({ theme, onInsert, onPublishToGallery }: { theme: CanvasTheme; onInsert: (payload: InsertAssetPayload) => void; onPublishToGallery?: (prompt: Prompt) => void }) {
     const copyText = useCopyText();
     const [keyword, setKeyword] = useState("");
     const [expanded, setExpanded] = useState<Record<string, boolean>>({ system: true });
@@ -596,7 +647,7 @@ const CanvasPromptsTab = memo(function CanvasPromptsTab({ theme, onInsert }: { t
                     </div>
                 )}
             </div>
-            <PromptDetailDialog prompt={detail} onClose={() => setDetail(null)} onCopy={(prompt) => copyText(prompt, "已复制提示词")} />
+            <PromptDetailDialog prompt={detail} onClose={() => setDetail(null)} onCopy={(prompt) => copyText(prompt, "已复制提示词")} onPublishToGallery={onPublishToGallery} />
         </div>
     );
 });

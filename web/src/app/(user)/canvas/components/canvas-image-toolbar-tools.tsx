@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Brush, Camera, Copy, FileText, Grid2x2, Lock, LockOpen, Maximize2, Scissors, Sparkles, Upload, ZoomIn } from "lucide-react";
 
 import type { CanvasNodeData } from "../types";
+import type { ReversePromptTemplate } from "../utils/canvas-reverse-prompt-templates";
 
 export type ImageNodeActionToolId = "copyPrompt" | "reversePrompt" | "replace" | "resize" | "maskEdit" | "crop" | "split" | "upscale" | "superResolve" | "angle" | "view";
 export type ImageQuickToolId = "info" | "delete" | "saveAsset" | "download" | "edit" | ImageNodeActionToolId;
@@ -19,7 +20,7 @@ export type ImageToolHandlers = {
     onAngle: (node: CanvasNodeData) => void;
     onViewImage: (node: CanvasNodeData) => void;
     onCopyPrompt: (node: CanvasNodeData) => void;
-    onReversePrompt: (node: CanvasNodeData) => void;
+    onReversePrompt: (node: CanvasNodeData, template?: ReversePromptTemplate) => void;
 };
 
 export type ImageToolDefinition = {

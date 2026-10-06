@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { App, Modal, Segmented, Tooltip } from "antd";
-import { Download, Ellipsis, FolderPlus, Image as ImageIcon, Info, MessageSquare, Minus, Music2, Plus, RefreshCw, Scissors, Settings2, Trash2, Upload, Video } from "lucide-react";
+import { App, Dropdown, Modal, Segmented, Tooltip, type MenuProps } from "antd";
+import { ChevronDown, Download, Ellipsis, FileText, FolderPlus, Image as ImageIcon, Info, MessageSquare, Minus, Music2, Plus, RefreshCw, Scissors, Settings2, Sparkles, Trash2, Upload, Video } from "lucide-react";
 
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes, getDataUrlByteSize } from "@/lib/image-utils";
@@ -11,6 +11,9 @@ import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasNodeType, type CanvasNodeData, type ViewportTransform } from "../types";
 import { isCanvasImageNodeType, isPanoramaNodeType } from "../utils/canvas-panorama";
 import { ImageToolSettingsModal, type ImageToolbarSettingsTool } from "./canvas-image-toolbar-settings-modal";
+import { CanvasReversePromptModal } from "./canvas-reverse-prompt-modal";
+import { getActiveReversePromptTemplateId, getStoredReversePromptTemplates, type ReversePromptTemplate } from "../utils/canvas-reverse-prompt-templates";
+
 import { IMAGE_QUICK_TOOLS_STORAGE_KEY, PANORAMA_QUICK_TOOLS_STORAGE_KEY, buildImageToolbarTools, defaultImageQuickToolIds, defaultPanoramaQuickToolIds, readImageQuickToolsConfig, type ImageQuickToolId } from "./canvas-image-toolbar-tools";
 
 type CanvasNodeHoverToolbarProps = {
@@ -28,6 +31,7 @@ type CanvasNodeHoverToolbarProps = {
     onTrimAudio: (node: CanvasNodeData) => void;
     onDownload: (node: CanvasNodeData) => void;
     onSaveAsset: (node: CanvasNodeData) => void;
+    onPublishGallery?: (node: CanvasNodeData) => void;
     onUploadMediaToCloud: (node: CanvasNodeData) => void;
     onUploadImageToCloud: (node: CanvasNodeData) => void;
     onMaskEdit: (node: CanvasNodeData) => void;
@@ -37,7 +41,7 @@ type CanvasNodeHoverToolbarProps = {
     onSuperResolve: (node: CanvasNodeData) => void;
     onAngle: (node: CanvasNodeData) => void;
     onViewImage: (node: CanvasNodeData) => void;
-    onReversePrompt: (node: CanvasNodeData) => void;
+    onReversePrompt: (node: CanvasNodeData, template?: ReversePromptTemplate) => void;
     onRetry: (node: CanvasNodeData) => void;
     onToggleFreeResize: (node: CanvasNodeData) => void;
     onDelete: (node: CanvasNodeData) => void;
@@ -68,6 +72,7 @@ export function CanvasNodeHoverToolbar({
     onTrimAudio,
     onDownload,
     onSaveAsset,
+    onPublishGallery,
     onUploadMediaToCloud,
     onUploadImageToCloud,
     onMaskEdit,
@@ -89,6 +94,7 @@ export function CanvasNodeHoverToolbar({
     const [draftImageToolIds, setDraftImageToolIds] = useState<ImageQuickToolId[]>(defaultImageQuickToolIds);
     const [draftShowImageToolLabels, setDraftShowImageToolLabels] = useState(true);
     const [imageToolSettingsOpen, setImageToolSettingsOpen] = useState(false);
+    const [reversePromptModalOpen, setReversePromptModalOpen] = useState(false);
     const { message } = App.useApp();
     const copyText = useCopyText();
     const isPanorama = isPanoramaNodeType(node?.type);
@@ -145,7 +151,9 @@ export function CanvasNodeHoverToolbar({
         }
         copyText(prompt, "提示词已复制");
     };
-    const imageTools = buildImageToolbarTools(node, { onUpload, onToggleFreeResize, onMaskEdit, onCrop, onSplit, onUpscale, onSuperResolve, onAngle, onViewImage, onCopyPrompt: copyImagePrompt, onReversePrompt }).filter((tool) => !isPanorama || tool.id !== "replace");
+    const imageTools = buildImageToolbarTools(node, { onUpload, onToggleFreeResize, onMaskEdit, onCrop, onSplit, onUpscale, onSuperResolve, onAngle, onViewImage, onCopyPrompt: copyImagePrompt, onReversePrompt }).filter(
+        (tool) => !isPanorama || tool.id !== "replace",
+    );
 
     function openImageToolSettings() {
         onKeep(node!.id);
@@ -161,22 +169,31 @@ export function CanvasNodeHoverToolbar({
     const nodeToolbarTools: ToolbarTool[] = [
         ...(canRetry ? [{ id: "retry", title: "重新生成", label: "重试", icon: <RefreshCw className="size-4" />, onClick: () => onRetry(node) }] : []),
         ...(hasImage || hasVideo || isText ? [{ id: "saveAsset", title: "加入我的素材", label: "存素材", icon: <FolderPlus className="size-4" />, onClick: () => onSaveAsset(node) }] : []),
+        ...(hasImage && onPublishGallery ? [{ id: "publishGallery", title: "一键发布作品到画廊", label: "发布画廊", icon: <Sparkles className="size-4 text-amber-500" />, onClick: () => onPublishGallery(node) }] : []),
         ...((hasVideo || hasAudio) && !node.metadata?.storageKey?.startsWith("server:") ? [{ id: "uploadMediaToCloud", title: "上传至云存储", label: "上传至云存储", icon: <Upload className="size-4" />, onClick: () => onUploadMediaToCloud(node) }] : []),
         ...(hasImage && !node.metadata?.storageKey?.startsWith("server:") ? [{ id: "uploadImageToCloud", title: "上传至云存储", label: "上传至云存储", icon: <Upload className="size-4" />, onClick: () => onUploadImageToCloud(node) }] : []),
-        ...(hasVideo ? [{
-            id: "extractAudio",
-            title: "分离音频",
-            label: "分离音频",
-            icon: <Music2 className="size-4" />,
-            onClick: () => onExtractAudio(node),
-        }] : []),
-        ...(hasAudio ? [{
-            id: "trimAudio",
-            title: "截取音频",
-            label: "截取",
-            icon: <Scissors className="size-4" />,
-            onClick: () => onTrimAudio(node),
-        }] : []),
+        ...(hasVideo
+            ? [
+                  {
+                      id: "extractAudio",
+                      title: "分离音频",
+                      label: "分离音频",
+                      icon: <Music2 className="size-4" />,
+                      onClick: () => onExtractAudio(node),
+                  },
+              ]
+            : []),
+        ...(hasAudio
+            ? [
+                  {
+                      id: "trimAudio",
+                      title: "截取音频",
+                      label: "截取",
+                      icon: <Scissors className="size-4" />,
+                      onClick: () => onTrimAudio(node),
+                  },
+              ]
+            : []),
         ...(hasImage || hasVideo || hasAudio ? [{ id: "download", title: hasAudio ? "下载音频" : hasVideo ? "下载视频" : "下载图片", label: "下载", icon: <Download className="size-4" />, onClick: () => onDownload(node) }] : []),
         ...(canOpenDialog ? [{ id: "edit", title: "编辑", label: "编辑", icon: <MessageSquare className="size-4" />, onClick: () => onToggleDialog(node) }] : []),
         ...(isText ? [{ id: "generateImage", title: "用文本生图", label: "生图", icon: <ImageIcon className="size-4" />, onClick: () => onGenerateImage(node) }] : []),
@@ -232,11 +249,23 @@ export function CanvasNodeHoverToolbar({
                 onMouseDown={(event) => event.stopPropagation()}
                 onPointerDown={(event) => event.stopPropagation()}
             >
-                {toolbarTools.map((tool) => (
-                    <ToolbarAction key={tool.id} {...tool} showLabel={showImageToolLabels} />
-                ))}
+                {toolbarTools.map((tool) => {
+                    if (tool.id === "reversePrompt" && node) {
+                        return <ReversePromptToolbarAction key={tool.id} node={node} onReversePrompt={onReversePrompt} onManageTemplates={() => setReversePromptModalOpen(true)} showLabel={showImageToolLabels} />;
+                    }
+                    return <ToolbarAction key={tool.id} {...tool} showLabel={showImageToolLabels} />;
+                })}
                 {hasImage ? <ToolbarAction id="more" title="配置快捷工具" label="更多" icon={<Ellipsis className="size-4" />} active={imageToolSettingsOpen} onClick={openImageToolSettings} showLabel={showImageToolLabels} /> : null}
             </div>
+            {hasImage ? (
+                <CanvasReversePromptModal
+                    open={reversePromptModalOpen}
+                    onClose={() => setReversePromptModalOpen(false)}
+                    onSelectAndRun={(tpl) => {
+                        if (node) onReversePrompt(node, tpl);
+                    }}
+                />
+            ) : null}
             {hasImage ? (
                 <ImageToolSettingsModal
                     open={imageToolSettingsOpen}
@@ -300,12 +329,33 @@ export function CanvasNodeInfoModal({ node, open, onClose }: { node: CanvasNodeD
                         <div className="thin-scrollbar h-full space-y-3 overflow-auto pr-1">
                             <InfoRow label="ID" value={node.id} />
                             <InfoRow label="名称" value={node.title || "未命名节点"} />
-                            <InfoRow label="类型" value={node.type === CanvasNodeType.Text ? "文本" : node.type === CanvasNodeType.Image ? "图片" : node.type === CanvasNodeType.Panorama ? "全景图" : node.type === CanvasNodeType.Video ? "视频" : node.type === CanvasNodeType.Audio ? "音频" : node.type === CanvasNodeType.Director ? "导演台" : node.type === CanvasNodeType.Group ? "组" : "生成配置"} />
+                            <InfoRow
+                                label="类型"
+                                value={
+                                    node.type === CanvasNodeType.Text
+                                        ? "文本"
+                                        : node.type === CanvasNodeType.Image
+                                          ? "图片"
+                                          : node.type === CanvasNodeType.Panorama
+                                            ? "全景图"
+                                            : node.type === CanvasNodeType.Video
+                                              ? "视频"
+                                              : node.type === CanvasNodeType.Audio
+                                                ? "音频"
+                                                : node.type === CanvasNodeType.Director
+                                                  ? "导演台"
+                                                  : node.type === CanvasNodeType.Group
+                                                    ? "组"
+                                                    : "生成配置"
+                                }
+                            />
                             <InfoRow label="尺寸" value={`${Math.round(node.width)} x ${Math.round(node.height)}`} />
                             <InfoRow label="位置" value={`${Math.round(node.position.x)}, ${Math.round(node.position.y)}`} />
                             <InfoRow label="状态" value={node.metadata?.status || "idle"} />
                             {batchCount > 1 ? <InfoRow label="图片组" value={`${batchCount} 张`} /> : null}
-                            {(isPanoramaNodeType(node.type) ? node.metadata?.panoramaSourcePrompt : node.metadata?.prompt) ? <InfoRow label="提示词" value={isPanoramaNodeType(node.type) ? node.metadata?.panoramaSourcePrompt : node.metadata?.prompt} /> : null}
+                            {(isPanoramaNodeType(node.type) ? node.metadata?.panoramaSourcePrompt : node.metadata?.prompt) ? (
+                                <InfoRow label="提示词" value={isPanoramaNodeType(node.type) ? node.metadata?.panoramaSourcePrompt : node.metadata?.prompt} />
+                            ) : null}
                             {imageBytes ? <InfoRow label="图片大小" value={formatBytes(imageBytes)} /> : null}
                             {node.metadata?.errorDetails ? (
                                 <div className="rounded-lg border p-3 text-red-400" style={{ borderColor: theme.node.stroke }}>
@@ -343,6 +393,69 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
         <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-3">
             <span className="opacity-50">{label}</span>
             <span className="min-w-0 whitespace-pre-wrap break-words">{value}</span>
+        </div>
+    );
+}
+
+function ReversePromptToolbarAction({ node, onReversePrompt, onManageTemplates, showLabel }: { node: CanvasNodeData; onReversePrompt: (node: CanvasNodeData, template?: ReversePromptTemplate) => void; onManageTemplates: () => void; showLabel: boolean }) {
+    const templates = getStoredReversePromptTemplates();
+    const activeDefaultId = getActiveReversePromptTemplateId();
+    const defaultTemplate = templates.find((t) => t.id === activeDefaultId) || templates[0];
+    const hasText = showLabel;
+
+    const menuItems: MenuProps["items"] = [
+        {
+            key: "templates-group",
+            type: "group",
+            label: <span className="text-[11px] text-neutral-400 font-normal">选择反推模板</span>,
+            children: templates.map((tpl) => {
+                const isDefault = tpl.id === activeDefaultId;
+                return {
+                    key: tpl.id,
+                    label: (
+                        <div className="flex items-center justify-between gap-4 py-1 pr-1 min-w-[210px]">
+                            <div className="flex flex-col">
+                                <span className="font-medium text-xs flex items-center gap-1.5 text-neutral-800 dark:text-neutral-200">
+                                    {tpl.name}
+                                    {isDefault ? <span className="text-emerald-500 font-normal text-[10px]">(默认)</span> : null}
+                                </span>
+                                {tpl.description ? <span className="text-[11px] text-neutral-400 mt-0.5 max-w-[200px] truncate">{tpl.description}</span> : null}
+                            </div>
+                        </div>
+                    ),
+                    onClick: () => {
+                        onReversePrompt(node, tpl);
+                    },
+                };
+            }),
+        },
+        {
+            type: "divider",
+        },
+        {
+            key: "manage",
+            icon: <Settings2 className="size-3.5" />,
+            label: <span className="text-xs">管理反推模板...</span>,
+            onClick: onManageTemplates,
+        },
+    ];
+
+    return (
+        <div className="group relative flex h-12 items-center whitespace-nowrap">
+            <div className="flex h-8 items-center rounded-lg transition hover:bg-white/10 bg-white/5">
+                <Tooltip title={`反推提示词 · ${defaultTemplate.name}`} placement="top" mouseEnterDelay={0.2} color="#ffffff">
+                    <button type="button" className={`flex h-full items-center ${hasText ? "gap-2 pl-2.5 pr-1.5" : "justify-center px-2"} transition hover:bg-white/10`} onClick={() => onReversePrompt(node, defaultTemplate)} aria-label="反推提示词">
+                        <FileText className="size-4" />
+                        {hasText ? <span>反推提示词</span> : null}
+                    </button>
+                </Tooltip>
+
+                <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={["click"]}>
+                    <button type="button" className="flex h-full items-center px-1.5 transition hover:bg-white/15 border-l border-white/10" title="切换反推模板" onClick={(e) => e.stopPropagation()}>
+                        <ChevronDown className="size-3 opacity-70 group-hover:opacity-100" />
+                    </button>
+                </Dropdown>
+            </div>
         </div>
     );
 }

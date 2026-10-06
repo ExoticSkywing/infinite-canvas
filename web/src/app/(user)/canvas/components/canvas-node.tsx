@@ -3,7 +3,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import dynamic from "next/dynamic";
-import { ChevronRight, Image as ImageIcon, Maximize2, Music2, Pause, Play, RefreshCw, Star, Video } from "lucide-react";
+import { ChevronRight, Image as ImageIcon, ImageOff, Maximize2, Music2, Pause, Play, RefreshCw, Star, Video } from "lucide-react";
+import { getProxyUrl, resolveImageUrl } from "@/services/image-storage";
 
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes, formatDuration } from "@/lib/image-utils";
@@ -739,6 +740,107 @@ function AudioNodeContent({ node, theme }: NodeContentRendererProps) {
     );
 }
 
+function CanvasImageRenderer({
+    src,
+    alt,
+    freeResize,
+    storageKey,
+}: {
+    src: string;
+    alt: string;
+    freeResize?: boolean;
+    storageKey?: string;
+}) {
+    const theme = canvasThemes[useThemeStore((state) => state.theme)];
+    const [imgSrc, setImgSrc] = useState(src);
+    const [hasError, setHasError] = useState(false);
+    const [retrying, setRetrying] = useState(false);
+    const triedProxyRef = useRef(false);
+    const triedResolveRef = useRef(false);
+
+    useEffect(() => {
+        setImgSrc(src);
+        setHasError(false);
+        triedProxyRef.current = false;
+        triedResolveRef.current = false;
+    }, [src, storageKey]);
+
+    const handleError = async () => {
+        // 1. 若为外链且尚未尝试过代理，尝试通过 /api/proxy-image 绕过防盗链与跨域
+        if (!triedProxyRef.current && (imgSrc.startsWith("http://") || imgSrc.startsWith("https://")) && !imgSrc.includes("/api/proxy-image")) {
+            triedProxyRef.current = true;
+            setImgSrc(getProxyUrl(imgSrc));
+            return;
+        }
+
+        // 2. 若有 storageKey，尝试重新从 IndexedDB 或服务端存储解析
+        if (!triedResolveRef.current && storageKey) {
+            triedResolveRef.current = true;
+            try {
+                const resolved = await resolveImageUrl(storageKey);
+                if (resolved && resolved !== imgSrc) {
+                    setImgSrc(resolved);
+                    return;
+                }
+            } catch {
+                // 忽略重试异常
+            }
+        }
+
+        // 3. 多重尝试均失败，展示优雅兜底占位
+        setHasError(true);
+    };
+
+    if (hasError || !imgSrc) {
+        return (
+            <div
+                className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center select-none"
+                style={{ background: theme.node.panel, color: theme.node.text }}
+            >
+                <ImageOff className="size-8 opacity-40" />
+                <span className="text-xs font-medium opacity-75">图片暂时无法加载</span>
+                <span className="text-[11px] opacity-45">来源链接已失效或存储未同步</span>
+                <button
+                    type="button"
+                    className="pointer-events-auto mt-1 flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium shadow-sm transition hover:scale-[1.02]"
+                    style={{ background: theme.toolbar.panel, borderColor: theme.toolbar.border, color: theme.node.text }}
+                    onClick={async (e) => {
+                        e.stopPropagation();
+                        setRetrying(true);
+                        setHasError(false);
+                        triedProxyRef.current = false;
+                        triedResolveRef.current = false;
+                        if (storageKey) {
+                            const res = await resolveImageUrl(storageKey).catch(() => "");
+                            setImgSrc(res || src);
+                        } else if (src) {
+                            setImgSrc(src + (src.includes("?") ? "&" : "?") + "_r=" + Date.now());
+                        }
+                        setRetrying(false);
+                    }}
+                >
+                    <RefreshCw className={`size-3 ${retrying ? "animate-spin" : ""}`} />
+                    <span>{retrying ? "重试中..." : "重新加载"}</span>
+                </button>
+            </div>
+        );
+    }
+
+    // 净化 alt 属性，避免反推等长提示词直接以大块未渲染 Markdown 暴露在画布上
+    const cleanAlt = alt ? alt.split("\n")[0].replace(/^[#*`\s-]+/, "").slice(0, 32) : "图片";
+
+    return (
+        <img
+            src={imgSrc}
+            alt={cleanAlt}
+            draggable={false}
+            onError={handleError}
+            onDragStart={(event) => event.preventDefault()}
+            className={`pointer-events-none block h-full w-full select-none ${freeResize ? "object-fill" : "object-contain"}`}
+        />
+    );
+}
+
 function ImageContent({
     node,
     isBatchRoot,
@@ -767,12 +869,11 @@ function ImageContent({
         <BatchFrame batchCount={isBatchRoot ? batchCount : 0} batchExpanded={batchExpanded} batchOpening={batchOpening} batchRecovering={batchRecovering} onToggleBatch={onToggleBatch}>
             <div className="h-full w-full overflow-hidden rounded-3xl">
                 {media ?? (
-                    <img
-                        src={node.metadata!.content!}
+                    <CanvasImageRenderer
+                        src={node.metadata?.content || ""}
                         alt={node.title}
-                        draggable={false}
-                        onDragStart={(event) => event.preventDefault()}
-                        className={`pointer-events-none block h-full w-full select-none ${node.metadata?.freeResize ? "object-fill" : "object-contain"}`}
+                        freeResize={node.metadata?.freeResize}
+                        storageKey={node.metadata?.storageKey}
                     />
                 )}
             </div>

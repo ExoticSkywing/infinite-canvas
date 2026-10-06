@@ -179,3 +179,38 @@ function loadImage(dataUrl: string) {
         image.src = src;
     });
 }
+
+export async function optimizeImageForVision(dataUrl: string, maxDimension = 1536, quality = 0.85): Promise<string> {
+    if (!dataUrl) return "";
+    let baseDataUrl = dataUrl;
+    // 上游服务商（如 CCH / Antigravity OAuth）强制要求 Base64 Data URI，拒绝远端与相对 URL
+    if (!baseDataUrl.startsWith("data:")) {
+        try {
+            const { imageToDataUrl } = await import("@/services/image-storage");
+            baseDataUrl = await imageToDataUrl({ url: dataUrl, dataUrl });
+        } catch {
+            // 继续向下尝试通过 Image 标签 + Canvas 转换
+        }
+    }
+    try {
+        const image = await loadImage(baseDataUrl);
+        const maxSide = Math.max(image.width, image.height);
+        if (baseDataUrl.startsWith("data:") && maxSide <= maxDimension && baseDataUrl.length < 500 * 1024) {
+            return baseDataUrl;
+        }
+        const scale = maxSide > maxDimension ? maxDimension / maxSide : 1;
+        const width = Math.round(image.width * scale);
+        const height = Math.round(image.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return baseDataUrl;
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(image, 0, 0, width, height);
+        return canvas.toDataURL("image/jpeg", quality);
+    } catch {
+        return baseDataUrl;
+    }
+}

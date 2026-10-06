@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { App, Button, Empty, Input, Modal, Pagination, Spin, Tabs, Tag } from "antd";
-import { Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Pencil, Plus, Search, Sparkles, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAssetStore, type Asset } from "@/stores/use-asset-store";
@@ -20,9 +20,10 @@ type Props = {
     defaultTab?: AssetPickerTab;
     onInsert: (payload: InsertAssetPayload) => void;
     onClose: () => void;
+    onPublishAssetToGallery?: (asset: Asset) => void;
 };
 
-export function AssetPickerModal({ open, defaultTab = "my-assets", onInsert, onClose }: Props) {
+export function AssetPickerModal({ open, defaultTab = "my-assets", onInsert, onClose, onPublishAssetToGallery }: Props) {
     const [activeTab, setActiveTab] = useState<AssetPickerTab>(defaultTab);
 
     useEffect(() => {
@@ -35,7 +36,7 @@ export function AssetPickerModal({ open, defaultTab = "my-assets", onInsert, onC
                 activeKey={activeTab}
                 onChange={(key) => setActiveTab(key as AssetPickerTab)}
                 items={[
-                    { key: "my-assets", label: "我的素材", children: <MyAssetsTab onInsert={onInsert} /> },
+                    { key: "my-assets", label: "我的素材", children: <MyAssetsTab onInsert={onInsert} onPublishAssetToGallery={onPublishAssetToGallery} /> },
                     { key: "library", label: "素材库", children: <LibraryTab onInsert={onInsert} /> },
                 ]}
             />
@@ -157,6 +158,7 @@ function PickerCard({
     onClick,
     onEdit,
     onDelete,
+    onPublish,
 }: {
     title: string;
     kind: string;
@@ -165,6 +167,7 @@ function PickerCard({
     onClick: () => void;
     onEdit?: () => void;
     onDelete?: () => void;
+    onPublish?: () => void;
 }) {
     return (
         <div
@@ -198,11 +201,25 @@ function PickerCard({
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-stone-950/0 text-sm font-medium text-white opacity-0 transition group-hover:bg-stone-950/55 group-hover:opacity-100">
                 插入
             </div>
-            {(onEdit || onDelete) ? (
+            {(onEdit || onDelete || onPublish) ? (
                 <div
                     className="absolute right-1.5 top-1.5 z-20 flex items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
                     onClick={(e) => e.stopPropagation()}
                 >
+                    {onPublish ? (
+                        <button
+                            type="button"
+                            title="一键发布到画廊"
+                            className="flex size-6 items-center justify-center rounded-md border border-amber-200/90 bg-amber-50/90 text-amber-600 shadow-sm backdrop-blur-sm transition hover:border-amber-300 hover:bg-amber-100 hover:text-amber-700 dark:border-amber-700/80 dark:bg-amber-950/80 dark:text-amber-300 dark:hover:border-amber-600 dark:hover:bg-amber-900"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onPublish();
+                            }}
+                        >
+                            <Sparkles className="size-3" />
+                        </button>
+                    ) : null}
                     {onEdit ? (
                         <button
                             type="button"
@@ -237,7 +254,7 @@ function PickerCard({
     );
 }
 
-function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => void }) {
+function MyAssetsTab({ onInsert, onPublishAssetToGallery }: { onInsert: (payload: InsertAssetPayload) => void; onPublishAssetToGallery?: (asset: Asset) => void }) {
     const { modal, message } = App.useApp();
     const assets = useAssetStore((state) => state.assets);
     const removeAsset = useAssetStore((state) => state.removeAsset);
@@ -349,6 +366,7 @@ function MyAssetsTab({ onInsert }: { onInsert: (payload: InsertAssetPayload) => 
                             onClick={() => handleInsert(asset)}
                             onEdit={() => handleOpenEdit(asset)}
                             onDelete={() => handleDelete(asset)}
+                            onPublish={onPublishAssetToGallery ? () => onPublishAssetToGallery(asset) : undefined}
                         />
                     ))}
                 </div>

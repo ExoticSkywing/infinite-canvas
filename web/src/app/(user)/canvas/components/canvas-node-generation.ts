@@ -204,6 +204,25 @@ export function buildNodeGenerationInputs(nodeId: string, nodes: CanvasNodeData[
     });
 }
 
+export async function buildNodeChatMessagesAsync(context: NodeGenerationContext): Promise<ChatCompletionMessage[]> {
+    if (!context.referenceImages.length) {
+        return [{ role: "user", content: context.prompt }];
+    }
+    const { optimizeImageForVision } = await import("../utils/canvas-image-data");
+    const optimizedImages = await Promise.all(
+        context.referenceImages.map(async (image) => {
+            const optimizedUrl = await optimizeImageForVision(image.dataUrl);
+            return { type: "image_url" as const, image_url: { url: optimizedUrl } };
+        })
+    );
+    return [
+        {
+            role: "user",
+            content: [{ type: "text" as const, text: context.prompt }, ...optimizedImages],
+        },
+    ];
+}
+
 export function buildNodeChatMessages(context: NodeGenerationContext): ChatCompletionMessage[] {
     if (!context.referenceImages.length) {
         return [{ role: "user", content: context.prompt }];

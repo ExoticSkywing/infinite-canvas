@@ -94,7 +94,7 @@ export function clearAutoSyncCache(storageKey: string) {
 
 export async function autoSyncImage(url: string, resultId: string, storageKey?: string) {
     if (!url || storageKey) return null;
-    return autoSyncToCloud(`image:${resultId}`, async () => {
+    const cloudSync = await autoSyncToCloud(`image:${resultId}`, async () => {
         try {
             return await uploadRemoteImageToServer(url, "image");
         } catch (error) {
@@ -103,6 +103,17 @@ export async function autoSyncImage(url: string, resultId: string, storageKey?: 
             return uploadImage(url, { localOnly: true });
         }
     });
+    if (cloudSync) return cloudSync;
+    // 降级保障：若未开启云端同步或云端同步失败，但图片为外链或 base64，
+    // 自动缓存至本地 IndexedDB，避免上游服务商在半小时后清理临时外链导致图片裂开
+    if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+        try {
+            return await uploadImage(url, { localOnly: true });
+        } catch (err) {
+            console.warn("Failed to locally cache generated image:", err);
+        }
+    }
+    return null;
 }
 
 function reportStorageSyncFailure(error: unknown) {
@@ -269,7 +280,11 @@ export async function resolveImageUrl(storageKey?: string, fallback = "") {
         serverUrls.set(id, url);
         return url;
     }
-    return await resolveLocalImageUrl(storageKey) || fallback;
+    const localUrl = await resolveLocalImageUrl(storageKey);
+    if (localUrl) return localUrl;
+    // 若本地未找到缓存且 fallback 为旧会话遗留的临时 blob: 地址，避免返回已失效的 blob URL
+    if (fallback.startsWith("blob:")) return "";
+    return fallback;
 }
 
 async function resolveLocalImageUrl(storageKey: string) {

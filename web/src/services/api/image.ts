@@ -1193,11 +1193,19 @@ export async function requestImageQuestion(config: AiConfig, messages: ChatCompl
                 );
             }
             if (isEventStreamResponse(response)) {
+                let reasoning = "";
                 await readJsonServerSentEvents(response, (event) => {
-                    const delta = (event.choices as Array<{ delta?: { content?: string } }> | undefined)?.[0]?.delta?.content || "";
-                    if (!delta) return;
-                    answer += delta;
-                    onDelta(answer);
+                    const choice = (event.choices as Array<{ delta?: { content?: string; reasoning?: string; reasoning_content?: string } }> | undefined)?.[0];
+                    const contentDelta = choice?.delta?.content || "";
+                    const reasoningDelta = choice?.delta?.reasoning_content || choice?.delta?.reasoning || "";
+
+                    if (contentDelta) {
+                        answer += contentDelta;
+                        onDelta(answer);
+                    } else if (reasoningDelta && !answer) {
+                        reasoning += reasoningDelta;
+                        onDelta("");
+                    }
                 });
                 return;
             }
