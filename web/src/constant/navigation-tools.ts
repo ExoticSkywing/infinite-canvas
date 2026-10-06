@@ -1,10 +1,15 @@
-import { FileText, ImagePlus, Images, Maximize2, Music2, Video } from "lucide-react";
+import { GalleryHorizontal, ImagePlus, Images, Maximize2, Music2, Video } from "lucide-react";
 
 export const navigationTools = [
     {
         slug: "canvas",
         label: "我的画布",
         icon: Maximize2,
+    },
+    {
+        slug: "prompts",
+        label: "画廊",
+        icon: GalleryHorizontal,
     },
     {
         slug: "image",
@@ -20,11 +25,6 @@ export const navigationTools = [
         slug: "music",
         label: "音乐创作台",
         icon: Music2,
-    },
-    {
-        slug: "prompts",
-        label: "画廊",
-        icon: FileText,
     },
     {
         slug: "assets",
