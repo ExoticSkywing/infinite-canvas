@@ -161,13 +161,13 @@ export default function PromptsPage() {
                         </p>
                     </div>
 
-                    {/* 统一宽度的搜索与筛选控制面板 (对齐 max-w-4xl) */}
-                    <div className="mx-auto mt-7 w-full max-w-4xl space-y-4">
+                    {/* 大气开阔的搜索与筛选控制面板 (扩展至 max-w-6xl) */}
+                    <div className="mx-auto mt-8 w-full max-w-6xl space-y-4">
                         <Input.Search
                             size="large"
-                            className="w-full"
+                            className="w-full text-base"
                             allowClear
-                            prefix={<Search className="mr-1.5 size-4 text-stone-400" />}
+                            prefix={<Search className="mr-2 size-4.5 text-stone-400" />}
                             value={titleInput}
                             placeholder="搜索作品标题、风格、标签或提示词 (按 Enter 搜索)"
                             onChange={(event) => {
@@ -180,14 +180,14 @@ export default function PromptsPage() {
                             onSearch={(val) => handleSearch(val)}
                         />
 
-                        {/* 筛选卡片区 */}
-                        <div className="space-y-3 rounded-2xl border border-stone-200/80 bg-white/60 p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] backdrop-blur-xs dark:border-stone-800/80 dark:bg-stone-900/50">
-                            {/* 分类行：左侧 label 固定 h-[26px] 居中，与 Tag 的 26px 高度严格基线居中对齐 */}
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                                <span className="flex h-[26px] w-12 shrink-0 items-center text-xs font-medium text-stone-500 dark:text-stone-400">
+                        {/* 筛选卡片区：加大内边距与留白，更显大气开阔 */}
+                        <div className="space-y-4 rounded-2xl border border-stone-200/80 bg-white/70 p-5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] backdrop-blur-md dark:border-stone-800/80 dark:bg-stone-900/60 sm:p-6">
+                            {/* 分类行：加大字号与胶囊间距，左侧 label 稳健对齐 */}
+                            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start">
+                                <span className="flex h-[32px] w-12 shrink-0 items-center text-xs font-semibold tracking-wider text-stone-400 uppercase dark:text-stone-500">
                                     分类
                                 </span>
-                                <div className="flex flex-1 flex-wrap items-center gap-2">
+                                <div className="flex flex-1 flex-wrap items-center gap-2.5">
                                     {promptCategoryOptions.map((category) => (
                                         <Tag.CheckableTag
                                             key={category}
@@ -201,12 +201,12 @@ export default function PromptsPage() {
                                 </div>
                             </div>
 
-                            {/* 标签行：左侧 label 固定 h-[26px] 居中，与 Tag 严格对齐，支持多标签滚动 */}
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                                <span className="flex h-[26px] w-12 shrink-0 items-center text-xs font-medium text-stone-500 dark:text-stone-400">
+                            {/* 标签行：高度上限提升，多行标签舒发展示，气度更开阔 */}
+                            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-start">
+                                <span className="flex h-[32px] w-12 shrink-0 items-center text-xs font-semibold tracking-wider text-stone-400 uppercase dark:text-stone-500">
                                     标签
                                 </span>
-                                <div className="thin-scrollbar flex max-h-[112px] flex-1 flex-wrap items-center gap-2 overflow-y-auto pr-1">
+                                <div className="thin-scrollbar flex max-h-[160px] flex-1 flex-wrap items-center gap-2.5 overflow-y-auto pr-1">
                                     {promptTagOptions.map((tag) => (
                                         <Tag.CheckableTag
                                             key={tag}
