@@ -19,8 +19,35 @@ const SIDE_BANNER_WIDTH = "min(calc(94vw - 1.88rem), clamp(394.8px, 31.96vw, 488
 const getBannerAngle = (offset: number) => offset === 0 ? 0 : offset < 0 ? 12 : -12;
 const getBannerTransform = (offset: number) => `perspective(900px) rotateY(${getBannerAngle(offset)}deg)`;
 
-const AnimatedBannerImage = memo(function AnimatedBannerImage({ src, alt }: { src: string; alt: string }) {
-    return <img src={src} alt={alt} draggable={false} decoding="async" className="block h-full w-full select-none rounded-[inherit] object-cover" />;
+const isVideoSource = (src?: string) => Boolean(src && /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(src));
+
+const BannerMedia = memo(function BannerMedia({ banner }: { banner: HomeBanner }) {
+    const videoSrc = isVideoSource(banner.videoUrl) ? banner.videoUrl : isVideoSource(banner.imageUrl) ? banner.imageUrl : undefined;
+
+    if (videoSrc) {
+        return (
+            <video
+                src={videoSrc}
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="metadata"
+                disablePictureInPicture
+                className="block size-full select-none rounded-[inherit] object-cover pointer-events-none"
+            />
+        );
+    }
+
+    return (
+        <img
+            src={banner.imageUrl}
+            alt={banner.alt}
+            draggable={false}
+            decoding="async"
+            className="block size-full select-none rounded-[inherit] object-cover"
+        />
+    );
 });
 
 export const HomeBannerCarousel = memo(function HomeBannerCarousel({ banners }: { banners: HomeBanner[] }) {
@@ -123,7 +150,8 @@ export const HomeBannerCarousel = memo(function HomeBannerCarousel({ banners }: 
             return;
         }
 
-        if (banner.videoUrl) setActiveVideoUrl(banner.videoUrl);
+        const popupVideo = banner.videoUrl || (isVideoSource(banner.imageUrl) ? banner.imageUrl : "");
+        if (popupVideo) setActiveVideoUrl(popupVideo);
         else if (banner.linkUrl) {
             window.open(banner.linkUrl, "_blank", "noopener,noreferrer");
         }
@@ -191,8 +219,8 @@ export const HomeBannerCarousel = memo(function HomeBannerCarousel({ banners }: 
                             <span
                                 className="relative isolate block size-full overflow-hidden rounded-2xl bg-stone-100 dark:bg-stone-900"
                             >
-                                <AnimatedBannerImage src={banner.imageUrl} alt={banner.alt} />
-                                {active && banner.videoUrl ? (
+                                <BannerMedia banner={banner} />
+                                {active && (banner.videoUrl || isVideoSource(banner.imageUrl)) ? (
                                     <span className="absolute inset-0 grid place-items-center bg-black/10">
                                         <span className="grid size-12 place-items-center rounded-full bg-black/55 text-white backdrop-blur">
                                             <Play className="ml-0.5 size-5 fill-current" />

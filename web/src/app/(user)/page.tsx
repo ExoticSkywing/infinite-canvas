@@ -28,12 +28,48 @@ import {
 
 
 const HOME_BANNERS: HomeBanner[] = [
-    { imageUrl: "https://gcore.jsdelivr.net/gh/tigerowo/cdn-tdeh@v0.7/img/infinite-canvas/88.webp", videoUrl: "", linkUrl: "https://88api.ai/sign-up?aff=25ty", alt: "1" },
-    { imageUrl: "https://gcore.jsdelivr.net/gh/tigerowo/cdn-tdeh@v0.6/img/infinite-canvas/metaso.webp", videoUrl: "", linkUrl: "https://metaso.cn/minimax-h3/?s=tt", alt: "2" },
-    { imageUrl: "https://gcore.jsdelivr.net/gh/tigerowo/cdn-tdeh@v0.5/img/infinite-canvas/3ddirectortl.webp", videoUrl: "", linkUrl: "", alt: "3" },
-    { imageUrl: "https://gcore.jsdelivr.net/gh/tigerowo/cdn-tdeh@v0.4/img/infinite-canvas/agent.webp", videoUrl: "https://gcore.jsdelivr.net/gh/tigerowo/cdn-tdeh@v0.4/img/infinite-canvas/agent.webm", linkUrl: "", alt: "4" },
-    { imageUrl: "https://gcore.jsdelivr.net/gh/tigerowo/cdn-tdeh@v0.4/img/infinite-canvas/panorama.webp", videoUrl: "", linkUrl: "", alt: "5" },
-    { imageUrl: "https://gcore.jsdelivr.net/gh/tigerowo/cdn-tdeh@v0.4/img/infinite-canvas/3ddirector.webp", videoUrl: "", linkUrl: "", alt: "6" },
+    // 默认居中高亮 C位 (activePosition=0, offset 0, index 0)
+    {
+        imageUrl: "https://api.minio.1yo.cc/nebuluxe/wp-content/uploads/2026/10/AI-Film-Created-Directed-by-nyn-ai-Personal-work-a.mp4",
+        videoUrl: "https://api.minio.1yo.cc/nebuluxe/wp-content/uploads/2026/10/AI-Film-Created-Directed-by-nyn-ai-Personal-work-a.mp4",
+        linkUrl: "",
+        alt: "AI Film Created & Directed by nyn ai",
+    },
+    // C位右边 (activePosition=0, offset +1, index 1)
+    {
+        imageUrl: "https://api.minio.1yo.cc/nebuluxe/wp-content/uploads/2026/10/FASHION-KILLA-A-PAGANI-x-FENDI-hypercar-this-rare.mp4",
+        videoUrl: "https://api.minio.1yo.cc/nebuluxe/wp-content/uploads/2026/10/FASHION-KILLA-A-PAGANI-x-FENDI-hypercar-this-rare.mp4",
+        linkUrl: "",
+        alt: "FASHION KILLA A PAGANI x FENDI",
+    },
+    // 后续顺次 1 (index 2)
+    {
+        imageUrl: "https://api.minio.1yo.cc/nebuluxe/wp-content/uploads/2026/10/1791367524602330939.mp4",
+        videoUrl: "https://api.minio.1yo.cc/nebuluxe/wp-content/uploads/2026/10/1791367524602330939.mp4",
+        linkUrl: "",
+        alt: "Creative Showcase 3",
+    },
+    // 后续顺次 2 (index 3)
+    {
+        imageUrl: "https://api.minio.1yo.cc/nebuluxe/wp-content/uploads/2026/10/Motion-designing-in-2026.mp4",
+        videoUrl: "https://api.minio.1yo.cc/nebuluxe/wp-content/uploads/2026/10/Motion-designing-in-2026.mp4",
+        linkUrl: "",
+        alt: "Motion designing in 2026",
+    },
+    // 后续顺次 3 (index 4)
+    {
+        imageUrl: "https://api.minio.1yo.cc/nebuluxe/wp-content/uploads/2026/10/House-of-Balloons-x-Rif3o-Every-frame-hits-differe.mp4",
+        videoUrl: "https://api.minio.1yo.cc/nebuluxe/wp-content/uploads/2026/10/House-of-Balloons-x-Rif3o-Every-frame-hits-differe.mp4",
+        linkUrl: "",
+        alt: "House of Balloons x Rif3o",
+    },
+    // C位左边 (activePosition=0, offset -1, index 5 / 数组末尾)
+    {
+        imageUrl: "https://api.minio.1yo.cc/nebuluxe/wp-content/uploads/2026/10/1791367559641181449.mp4",
+        videoUrl: "https://api.minio.1yo.cc/nebuluxe/wp-content/uploads/2026/10/1791367559641181449.mp4",
+        linkUrl: "",
+        alt: "Creative Showcase Left",
+    },
 ];
 
 function toPendingAgentAsset(payload: InsertAssetPayload, label: string): PendingAgentAsset {
