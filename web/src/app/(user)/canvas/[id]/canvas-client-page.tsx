@@ -57,6 +57,7 @@ import { fitNodeSize, nodeSizeFromRatio } from "../utils/canvas-node-size";
 import { captureVideoFrame, type VideoFramePosition } from "../utils/canvas-video-frame";
 import { PANORAMA_IMAGE_SIZE, PANORAMA_NODE_SIZE, buildPanoramaPrompt, isCanvasImageNodeType, isPanoramaNodeType } from "../utils/canvas-panorama";
 import { getActiveReversePromptTemplate, type ReversePromptTemplate } from "../utils/canvas-reverse-prompt-templates";
+import { checkProcessOrDeltaPrompt } from "@/services/ai-asset-extractor";
 import { applyCameraPrompt } from "../utils/canvas-camera";
 import { GROUP_PADDING, findContainingGroupId, findGroupDropTarget, getNodeBounds, snapNodesIntoGroup } from "../utils/canvas-group";
 import { App, Button, Dropdown, Modal, Slider } from "antd";
@@ -2698,9 +2699,12 @@ function InfiniteCanvasPage({ projectId }: { projectId: string }) {
                 const imageUrl = stored?.url || node.metadata.content;
                 const storageKey = stored?.storageKey || node.metadata.storageKey;
                 const dataUrl = storageKey ? "" : imageUrl;
+                const isDelta = checkProcessOrDeltaPrompt(nodePrompt).isDelta;
+                const cleanNodeTitle = node.title && !node.title.startsWith("##") && !node.title.startsWith("###") && !node.title.startsWith("图片") && !node.title.startsWith("节点") ? node.title : "";
+                const initialTitle = cleanNodeTitle || (nodePrompt && !isDelta ? nodePrompt.split("\n")[0].replace(/^[#*`\s-]+/, "").slice(0, 28) : (node.title || "画布作品"));
                 addAsset({
                     kind: "image",
-                    title: (nodePrompt || node.title || "画布图片").slice(0, 24),
+                    title: initialTitle,
                     coverUrl: imageUrl,
                     tags: [],
                     source: "Canvas",
@@ -3166,7 +3170,7 @@ function InfiniteCanvasPage({ projectId }: { projectId: string }) {
             setSelectedConnectionId(null);
             return;
         }
-        return insertAssistantImage({ id: nodeId || `asset-${Date.now()}`, prompt: payload.title, dataUrl: payload.dataUrl, storageKey: payload.storageKey, source: payload.source }, position, nodeId);
+        return insertAssistantImage({ id: nodeId || `asset-${Date.now()}`, prompt: payload.prompt || payload.title, title: payload.title, dataUrl: payload.dataUrl, storageKey: payload.storageKey, source: payload.source }, position, nodeId);
     }
 
     const handleDrop = useCallback(
@@ -4533,7 +4537,7 @@ function InfiniteCanvasPage({ projectId }: { projectId: string }) {
             const node: CanvasNodeData = {
                 id,
                 type: CanvasNodeType.Image,
-                title: image.prompt.slice(0, 32) || "Generated Image",
+                title: image.title || image.prompt.slice(0, 32) || "Generated Image",
                 position: { x: center.x - config.width / 2, y: center.y - config.height / 2 },
                 width: config.width,
                 height: config.height,

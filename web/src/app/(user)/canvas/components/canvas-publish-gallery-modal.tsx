@@ -6,9 +6,11 @@ import { ExternalLink, Sparkles, UploadCloud, Tag as TagIcon, Layers } from "luc
 import { saveAdminPrompt } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
 import { useEffectiveConfig } from "@/stores/use-config-store";
-import { getActiveReversePromptTemplate } from "../utils/canvas-reverse-prompt-templates";
-import { requestImageQuestion } from "@/services/api/image";
-import { optimizeImageForVision } from "../utils/canvas-image-data";
+import {
+    checkProcessOrDeltaPrompt,
+    DEFAULT_ASSET_CATEGORIES,
+    extractAssetMetaFromImage,
+} from "@/services/ai-asset-extractor";
 
 export type PublishGalleryData = {
     title: string;
@@ -18,196 +20,7 @@ export type PublishGalleryData = {
     tags?: string[];
 };
 
-const DEFAULT_CATEGORIES = [
-    { label: "人物写真", value: "人物写真" },
-    { label: "潮流时装摄影", value: "潮流时装摄影" },
-    { label: "商业摄影", value: "商业摄影" },
-    { label: "电影海报", value: "电影海报" },
-    { label: "风格探索", value: "风格探索" },
-    { label: "二次元动漫", value: "二次元动漫" },
-    { label: "科幻未来", value: "科幻未来" },
-    { label: "超现实艺术", value: "超现实艺术" },
-];
-
-const DELTA_KEYWORDS = [
-    "腿型", "粗", "细", "好看", "难看", "换个", "改下", "修改", "去掉", "添加", "微调", "重新设计",
-    "调整", "修长", "把", "不要", "参考图片", "说实话", "感觉", "有点", "@[node:", "图1", "图2", "图片1", "图片2"
-];
-
-function checkProcessOrDeltaPrompt(prompt: string): { isDelta: boolean; matchedKeyword?: string } {
-    if (!prompt) return { isDelta: true, matchedKeyword: "内容为空" };
-    const trimmed = prompt.trim();
-    if (trimmed.length < 35) return { isDelta: true, matchedKeyword: "字数较短" };
-    const lower = trimmed.toLowerCase();
-    for (const kw of DELTA_KEYWORDS) {
-        if (lower.includes(kw.toLowerCase())) {
-            return { isDelta: true, matchedKeyword: kw };
-        }
-    }
-    return { isDelta: false };
-}
-
-function normalizeCategory(rawCat: string): string {
-    if (!rawCat) return "人物写真";
-    const clean = rawCat.replace(/[\[\]【】\s*`]/g, "").trim();
-    if (!clean) return "人物写真";
-    for (const opt of DEFAULT_CATEGORIES) {
-        if (opt.value === clean || opt.label.includes(clean)) {
-            return opt.value;
-        }
-    }
-    // 灵活保留 AI 给出的贴切分类名（限制在 12 字内），不再强行收缩为固定几个预置类
-    return clean.slice(0, 12);
-}
-
-function normalizeTags(rawTags: string, rawText: string): string[] {
-    let list: string[] = [];
-    if (rawTags) {
-        list = rawTags
-            .split(/[,，、\n]+/)
-            .map((t) => t.replace(/[\[\]"'\s]/g, "").trim())
-            .filter((t) => t.length > 0 && t.length <= 15);
-    }
-    if (list.length === 0) {
-        const candidateTags: string[] = ["AI绘画", "7维解剖"];
-        if (rawText.includes("棚拍") || rawText.includes("影棚")) candidateTags.push("商业棚拍");
-        if (rawText.includes("机能")) candidateTags.push("机能风");
-        if (rawText.includes("胶片")) candidateTags.push("胶片质感");
-        if (rawText.includes("女性") || rawText.includes("少女")) candidateTags.push("女性写真");
-        if (rawText.includes("85mm")) candidateTags.push("85mm长焦");
-        if (rawText.includes("赛博朋克")) candidateTags.push("赛博朋克");
-        if (rawText.includes("超现实")) candidateTags.push("超现实");
-        list = candidateTags;
-    }
-    return Array.from(new Set(list)).slice(0, 5);
-}
-
-function cleanPromptText(text: string): string {
-    if (!text) return "";
-    let s = text.trim();
-    // 剔除开头的 Prompt 标题整行或前缀（如 " Master Prompt:**\n", "**Master Prompt:**\n", "**Prompt:** " 等）
-    s = s.replace(/^[#*_~`\s]*(?:master\s*prompt|positive\s*prompt|prompt|正向提示词|英文提示词)[#*_~`\s]*[:：]?[ \t*`_~]*(?:\n|$)/i, "");
-    s = s.replace(/^[#*_~`\s]*(?:master\s*prompt|positive\s*prompt|prompt|正向提示词|英文提示词)[#*_~`\s]*[:：]?[ \t*`_~]*/i, "");
-    // 剔除代码块围栏
-    s = s.replace(/^```[a-zA-Z0-9_-]*\s*\n?/i, "");
-    s = s.replace(/\n?```\s*$/i, "");
-    // 剔除引用符 >
-    s = s.replace(/^>\s*/gm, "");
-    // 剔除可能残留的内部代码块
-    s = s.replace(/```[a-zA-Z0-9_-]*\s*\n?/gi, "");
-    s = s.replace(/\n?```/gi, "");
-    // 剔除头尾多余 markdown 修饰
-    s = s.replace(/^[*_~`]+/, "");
-    s = s.replace(/[*_~`]+$/, "");
-    return s.trim();
-}
-
-function extractStep2Prompts(rawText: string): string {
-    // 1. 优先定位第二步区间
-    const step2Match = rawText.match(/###\s*第二步[^\n]*\n([\s\S]*?)(?=(?:###\s*第三步|---\s*\n\s*###\s*第三步|\n\n-\s*【推荐分类】|$))/i);
-    const step2Block = step2Match ? step2Match[1] : rawText;
-
-    let posText = "";
-    let negText = "";
-
-    // 寻找负向词分隔符
-    const negSplitRegex = /(?:(?:\*{1,2}\s*)?(?:Negative\s*Prompt|负向提示词|反向提示词|禁止项)(?:\s*\*{1,2})?[:：]?)/i;
-    const parts = step2Block.split(negSplitRegex);
-
-    if (parts.length > 1) {
-        posText = parts[0];
-        negText = parts.slice(1).join("\n");
-    } else {
-        const promptMatch = step2Block.match(/(?:####\s*Prompt:?|Prompt:?)\s*\n*>?\s*([\s\S]*?)(?=(?:####\s*Negative Prompt|Negative Prompt|$))/i);
-        const negativeMatch = step2Block.match(/(?:####\s*Negative Prompt:?|Negative Prompt:?)\s*\n*>?\s*([\s\S]*?)$/i);
-        if (promptMatch && promptMatch[1]) {
-            posText = promptMatch[1];
-            negText = negativeMatch?.[1] || "";
-        } else {
-            posText = step2Block;
-        }
-    }
-
-    const cleanPositive = cleanPromptText(posText);
-    const cleanNegative = cleanPromptText(negText);
-
-    if (cleanNegative) {
-        return `${cleanPositive}\n\nNegative Prompt:\n${cleanNegative}`;
-    }
-    return cleanPositive || rawText.trim();
-}
-
-function extractGalleryPromptAndTitle(rawText: string, fallbackTitle: string) {
-    let cleanPrompt = "";
-    let extractedTitle = fallbackTitle;
-
-    // 1. 精确提取第二步工业级英文提示词（兼容代码块 ```text、Markdown 加粗与普通文本格式）
-    cleanPrompt = extractStep2Prompts(rawText);
-
-    // 2. 提取 AI 智能推荐的作品标题、分类与标签
-    const lines = rawText.split("\n");
-    let rawTitle = "";
-    let rawCategory = "";
-    let rawTags = "";
-
-    const titleLineRegex = /^[\s\-*#_~`]*?(?:【?\s*(?:作品|画廊|精选|推荐)?(?:标题|Title)\s*】?|\bTitle\b)[\s*_~`]*?[:：]\s*(.+)$/i;
-    const catLineRegex = /^[\s\-*#_~`]*?(?:【?\s*(?:推荐|所属)?分类\s*】?|\bCategory\b)[\s*_~`]*?[:：]\s*(.+)$/i;
-    const tagLineRegex = /^[\s\-*#_~`]*?(?:【?\s*(?:精选|推荐)?标签\s*】?|\bTags?\b)[\s*_~`]*?[:：]\s*(.+)$/i;
-
-    for (const rawLine of lines) {
-        const line = rawLine.trim();
-        if (/^#{1,6}\s+.*(?:第[一二三四五六七八九十\d]+步|步骤|元数据|Metadata)/i.test(line)) continue;
-
-        if (!rawTitle) {
-            const m = line.match(titleLineRegex);
-            if (m) rawTitle = m[1].replace(/^[[\[【\s*`]+|[\]】\s*`]+$/g, "").trim();
-        }
-        if (!rawCategory) {
-            const m = line.match(catLineRegex);
-            if (m) rawCategory = m[1].replace(/^[[\[【\s*`]+|[\]】\s*`]+$/g, "").trim();
-        }
-        if (!rawTags) {
-            const m = line.match(tagLineRegex);
-            if (m) rawTags = m[1].replace(/^[[\[【\s*`]+|[\]】\s*`]+$/g, "").trim();
-        }
-    }
-
-    if (!rawTitle) {
-        const inlineTitle = rawText.match(/(?:(?:作品|画廊|推荐)?标题|Title)[^\n：:]*?[:：]\s*([^\n；。]+)/i);
-        if (inlineTitle) rawTitle = inlineTitle[1].replace(/^[[\[【\s*`]+|[\]】\s*`]+$/g, "").trim();
-    }
-    if (!rawCategory) {
-        const inlineCat = rawText.match(/(?:(?:推荐|所属)?分类|Category)[^\n：:]*?[:：]\s*([^\n；。]+)/i);
-        if (inlineCat) rawCategory = inlineCat[1].replace(/^[[\[【\s*`]+|[\]】\s*`]+$/g, "").trim();
-    }
-    if (!rawTags) {
-        const inlineTags = rawText.match(/(?:(?:精选|推荐)?标签|Tags?)[^\n：:]*?[:：]\s*([^\n；。]+)/i);
-        if (inlineTags) rawTags = inlineTags[1].replace(/^[[\[【\s*`]+|[\]】\s*`]+$/g, "").trim();
-    }
-
-    const category = normalizeCategory(rawCategory);
-    const tags = normalizeTags(rawTags, rawText);
-
-    // 格式化作品标题：优先采用 AI 提炼的高级画廊标题；若无则自然顺畅组合为具有艺术感的主题标题
-    if (rawTitle && rawTitle.length >= 3) {
-        extractedTitle = rawTitle.slice(0, 30);
-    } else if (tags.length >= 2) {
-        extractedTitle = `${tags[0]}${tags[1]}写真大片`;
-    } else if (tags.length === 1) {
-        extractedTitle = `${tags[0]}${category}视觉`;
-    } else {
-        const isDelta = checkProcessOrDeltaPrompt(fallbackTitle).isDelta;
-        extractedTitle = fallbackTitle && !isDelta ? fallbackTitle : `${category}视觉大片`;
-    }
-
-    return {
-        cleanPrompt: cleanPrompt || rawText.trim(),
-        fullReport: rawText.trim(),
-        title: extractedTitle,
-        category,
-        tags,
-    };
-}
+const DEFAULT_CATEGORIES = DEFAULT_ASSET_CATEGORIES;
 
 export function CanvasPublishGalleryModal({
     open,
@@ -259,46 +72,16 @@ export function CanvasPublishGalleryModal({
 
         try {
             setExtracting(true);
-            const template = getActiveReversePromptTemplate();
-            const textConfig = {
-                ...effectiveConfig,
-                model: effectiveConfig.textModel || effectiveConfig.model || "gpt-5.5",
-            };
-
-            // 无论来源是云存储还是本地URL，统一转换为轻量安全 Base64 Data URI
-            let optimizedUrl = await optimizeImageForVision(currentCover);
-            if (!optimizedUrl || !optimizedUrl.startsWith("data:")) {
-                const { imageToDataUrl } = await import("@/services/image-storage");
-                optimizedUrl = await imageToDataUrl({ url: currentCover, dataUrl: currentCover });
-            }
-
-            // 附加强制提取画廊标题、分类与标签的指令
-            const extractionInstruction = `${template.prompt}
-
----
-### 第三步：画廊元数据提取（必须输出）
-- 【作品标题】：[提炼一个高度契合画面视觉意境与题材的画廊作品标题，8到18字，如：猫耳头盔亚文化时尚大片、未来机能风清冷少女特写、极简影棚光影视觉大片，严禁直接拼接标签]
-- 【推荐分类】：[提炼 2 到 6 个字最切合画面主题的分类名称，无需拘泥固定词，只要贴切精准即可，如：潮流时装摄影、人物写真、概念艺术、潮玩手办、电影海报等]
-- 【精选标签】：[提炼 3 到 5 个高精度具象视觉标签，用逗号分隔，如：机能风, 商业棚拍, 85mm长焦, 东亚女性, 清冷感]`;
-
-            const chatMessages = [
-                {
-                    role: "user" as const,
-                    content: [
-                        { type: "text" as const, text: extractionInstruction },
-                        { type: "image_url" as const, image_url: { url: optimizedUrl } },
-                    ],
-                },
-            ];
-
-            let streamed = "";
-            await requestImageQuestion(textConfig, chatMessages, (chunk) => {
-                streamed = chunk;
-                form.setFieldValue("prompt", chunk);
-            });
-
             const currentTitle = form.getFieldValue("title") || initialData?.title || "";
-            const parsed = extractGalleryPromptAndTitle(streamed, currentTitle);
+            const parsed = await extractAssetMetaFromImage(
+                currentCover,
+                effectiveConfig,
+                currentTitle,
+                (streamed) => {
+                    form.setFieldValue("prompt", streamed);
+                },
+            );
+
             setExtractedVersions({
                 clean: parsed.cleanPrompt,
                 full: parsed.fullReport,

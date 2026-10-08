@@ -159,10 +159,10 @@ export type CanvasAssistantReference = {
 };
 
 export type InsertAssetPayload =
-    | { kind: "text"; content: string; title: string; assetId?: string; source?: "asset" | "library" }
-    | { kind: "image"; dataUrl: string; title: string; storageKey?: string; assetId?: string; width?: number; height?: number; bytes?: number; mimeType?: string; source?: "asset" | "library" }
-    | { kind: "video"; url: string; title: string; storageKey?: string; assetId?: string; width?: number; height?: number; bytes?: number; mimeType?: string; source?: "asset" | "library" }
-    | { kind: "audio"; url: string; title: string; storageKey?: string; assetId?: string; bytes?: number; mimeType?: string; durationMs?: number; source?: "asset" | "library" };
+    | { kind: "text"; content: string; title: string; assetId?: string; source?: "asset" | "library"; prompt?: string; category?: string; tags?: string[] }
+    | { kind: "image"; dataUrl: string; title: string; storageKey?: string; assetId?: string; width?: number; height?: number; bytes?: number; mimeType?: string; source?: "asset" | "library"; prompt?: string; category?: string; tags?: string[] }
+    | { kind: "video"; url: string; title: string; storageKey?: string; assetId?: string; width?: number; height?: number; bytes?: number; mimeType?: string; source?: "asset" | "library"; prompt?: string; category?: string; tags?: string[] }
+    | { kind: "audio"; url: string; title: string; storageKey?: string; assetId?: string; bytes?: number; mimeType?: string; durationMs?: number; source?: "asset" | "library"; prompt?: string; category?: string; tags?: string[] };
 
 export type PendingAgentAsset = {
     nodeId: string;
@@ -182,6 +182,7 @@ export type CanvasAssistantImage = {
     storageKey?: string;
     prompt: string;
     source?: "asset" | "library";
+    title?: string;
 };
 
 export type CanvasAgentSkillSelection = {

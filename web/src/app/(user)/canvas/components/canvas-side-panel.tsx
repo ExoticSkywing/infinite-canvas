@@ -602,15 +602,21 @@ function DraggableAssetCard({
                     ) : null}
                 </div>
             ) : null}
+            {title ? (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent px-2 pb-1.5 pt-4 text-[10px] text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    <span className="block truncate font-medium drop-shadow-sm">{title}</span>
+                </div>
+            ) : null}
         </div>
     );
 }
 
 function assetPayload(asset: Asset): InsertAssetPayload {
-    if (asset.kind === "text") return { kind: "text", content: asset.data.content, title: asset.title, assetId: asset.id, source: "asset" };
-    if (asset.kind === "image") return { kind: "image", dataUrl: asset.data.dataUrl, storageKey: asset.data.storageKey, title: asset.title, assetId: asset.id, width: asset.data.width, height: asset.data.height, bytes: asset.data.bytes, mimeType: asset.data.mimeType, source: "asset" };
-    if (asset.kind === "video") return { kind: "video", url: asset.data.url, storageKey: asset.data.storageKey, title: asset.title, assetId: asset.id, width: asset.data.width, height: asset.data.height, bytes: asset.data.bytes, mimeType: asset.data.mimeType, source: "asset" };
-    return { kind: "audio", url: asset.data.url, storageKey: asset.data.storageKey, title: asset.title, assetId: asset.id, bytes: asset.data.bytes, mimeType: asset.data.mimeType, durationMs: asset.data.durationMs, source: "asset" };
+    const assetPrompt = (typeof asset.metadata?.prompt === "string" ? asset.metadata.prompt : "") || (asset.kind === "text" ? asset.data.content : "");
+    if (asset.kind === "text") return { kind: "text", content: asset.data.content, title: asset.title, assetId: asset.id, source: "asset", prompt: assetPrompt, category: asset.category, tags: asset.tags };
+    if (asset.kind === "image") return { kind: "image", dataUrl: asset.data.dataUrl, storageKey: asset.data.storageKey, title: asset.title, assetId: asset.id, width: asset.data.width, height: asset.data.height, bytes: asset.data.bytes, mimeType: asset.data.mimeType, source: "asset", prompt: assetPrompt, category: asset.category, tags: asset.tags };
+    if (asset.kind === "video") return { kind: "video", url: asset.data.url, storageKey: asset.data.storageKey, title: asset.title, assetId: asset.id, width: asset.data.width, height: asset.data.height, bytes: asset.data.bytes, mimeType: asset.data.mimeType, source: "asset", prompt: assetPrompt, category: asset.category, tags: asset.tags };
+    return { kind: "audio", url: asset.data.url, storageKey: asset.data.storageKey, title: asset.title, assetId: asset.id, bytes: asset.data.bytes, mimeType: asset.data.mimeType, durationMs: asset.data.durationMs, source: "asset", prompt: assetPrompt, category: asset.category, tags: asset.tags };
 }
 
 function libraryPayload(asset: AssetLibraryItem): InsertAssetPayload {
