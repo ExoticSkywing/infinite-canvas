@@ -93,7 +93,7 @@ const STATUS_COLOR: Record<string, string> = {
     error: "#ef4444",
 };
 
-export function CanvasSidePanel({ nodes, selectedNodeIds, open, width, onWidthChange, onFocusNode, onAssetDragStart, onAssetDragEnd, onInsertAsset, onPublishAssetToGallery }: Props) {
+export function CanvasSidePanel({ nodes, selectedNodeIds, open, width, onWidthChange, onFocusNode, onAssetDragStart, onAssetDragEnd, onInsertAsset, onPublishAssetToGallery, onPublishPromptToGallery }: Props) {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const [tab, setTab] = useState<PanelTab>("canvas");
     const [mounted, setMounted] = useState(open);
@@ -156,7 +156,7 @@ export function CanvasSidePanel({ nodes, selectedNodeIds, open, width, onWidthCh
                     {tab === "canvas" ? (
                         <CanvasNodesTab nodes={nodes} selectedNodeIds={selectedNodeIds} onFocusNode={onFocusNode} theme={theme} />
                     ) : tab === "assets" ? (
-                        <CanvasAssetsTab theme={theme} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} onPublishAssetToGallery={onPublishAssetToGallery} />
+                        <CanvasAssetsTab theme={theme} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} onPublishAssetToGallery={onPublishAssetToGallery} onPublishPromptToGallery={onPublishPromptToGallery} />
                     ) : (
                         <CanvasPromptsTab theme={theme} onInsert={onInsertAsset} onPublishToGallery={onPublishPromptToGallery} />
                     )}
@@ -265,7 +265,7 @@ function CanvasNodesTab({ nodes, selectedNodeIds, onFocusNode, theme }: { nodes:
     );
 }
 
-const CanvasAssetsTab = memo(function CanvasAssetsTab({ theme, onAssetDragStart, onAssetDragEnd, onPublishAssetToGallery }: { theme: CanvasTheme; onAssetDragStart: (payload: InsertAssetPayload) => void; onAssetDragEnd: () => void; onPublishAssetToGallery?: (asset: Asset) => void }) {
+const CanvasAssetsTab = memo(function CanvasAssetsTab({ theme, onAssetDragStart, onAssetDragEnd, onPublishAssetToGallery, onPublishPromptToGallery }: { theme: CanvasTheme; onAssetDragStart: (payload: InsertAssetPayload) => void; onAssetDragEnd: () => void; onPublishAssetToGallery?: (asset: Asset) => void; onPublishPromptToGallery?: (prompt: Prompt) => void }) {
     const [source, setSource] = useState<"mine" | "library">("mine");
     const [formOpen, setFormOpen] = useState(false);
     const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
@@ -287,7 +287,7 @@ const CanvasAssetsTab = memo(function CanvasAssetsTab({ theme, onAssetDragStart,
                 <AssetSourceTab label="素材库" active={source === "library"} theme={theme} onClick={() => setSource("library")} />
             </div>
             {source === "mine" ? (
-                <MyAssetsTab theme={theme} onAdd={handleOpenAdd} onEdit={handleOpenEdit} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} onPublishAssetToGallery={onPublishAssetToGallery} />
+                <MyAssetsTab theme={theme} onAdd={handleOpenAdd} onEdit={handleOpenEdit} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} onPublishAssetToGallery={onPublishAssetToGallery} onPublishPromptToGallery={onPublishPromptToGallery} />
             ) : (
                 <LibraryAssetsTab theme={theme} onAssetDragStart={onAssetDragStart} onAssetDragEnd={onAssetDragEnd} />
             )}
@@ -630,7 +630,7 @@ const CanvasPromptsTab = memo(function CanvasPromptsTab({ theme, onInsert, onPub
         queryFn: () => fetchPrompts({ page: 1, pageSize: 1 }),
         retry: false,
     });
-    const categories = useMemo(() => ["system", ...(categoryQuery.data?.categories.filter((category) => category !== "system") || [])], [categoryQuery.data?.categories]);
+    const categories = useMemo(() => ["system", ...(categoryQuery.data?.categories?.filter((category) => category !== "system") || [])], [categoryQuery.data?.categories]);
 
     return (
         <div className="flex h-full flex-col">

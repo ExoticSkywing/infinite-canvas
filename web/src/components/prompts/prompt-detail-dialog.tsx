@@ -90,14 +90,7 @@ export function PromptDetailDialog({
             wrapClassName={isDark ? "dark" : ""}
             rootClassName={isDark ? "dark" : ""}
             styles={{
-                content: {
-                    padding: 0,
-                    borderRadius: 24,
-                    overflow: "hidden",
-                    backgroundColor: "transparent",
-                    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.45)",
-                },
-                body: { padding: 0 },
+                body: { padding: 0, backgroundColor: "transparent" },
             }}
         >
             {prompt ? (
